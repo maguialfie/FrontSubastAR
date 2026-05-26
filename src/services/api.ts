@@ -33,7 +33,15 @@ type BackendLot = {
   artista?: string; historia?: string; fecha_creacion?: string; dueno_actual?: string; estado?: string;
 };
 type BackendBid = { id: number; nombre_usuario: string; monto: number; timestamp: string; es_ganadora?: boolean };
-type BackendResult = { estado: string; item_id: number; nombre_item: string; fue_ganador: boolean; monto_final?: number };
+type BackendResult = {
+  estado: string;
+  item_id: number;
+  nombre_item: string;
+  fue_ganador: boolean;
+  monto_final?: number;
+  medio_pago?: string;
+  fecha?: string;
+};
 type BackendLive = {
   item_actual?: BackendLot; mejor_oferta?: number; puja_minima?: number; puja_maxima?: number;
   segundos_restantes?: number; historial_pujas?: BackendBid[];
@@ -252,6 +260,7 @@ export const auctionService = {
     return {
       status: value.estado, lotId: String(value.item_id), lotName: value.nombre_item,
       won: value.fue_ganador, finalAmount: value.monto_final,
+      paymentMethod: value.medio_pago, date: value.fecha,
     };
   },
 };

@@ -38,22 +38,22 @@ export function HomeScreen() {
   }
   return (
     <Screen>
-      <Header title="Inicio" right={<Ionicons name="notifications-outline" size={22} color={colors.text} />} />
+      <Header title="" right={<Ionicons name="notifications-outline" size={22} color={colors.text} />} />
       <Body muted>Bienvenido{session ? `, ${session.profile.name.split(' ')[0]}` : ''}</Body>
       {isLoading ? <LoadingState /> : isError ? <ErrorState onRetry={() => refetch()} /> : featured ? <AuctionCard auction={featured} onPress={() => router.push(`/auction/${featured.id}`)} /> : <EmptyState title="No hay subastas destacadas" message="Volve a consultar mas tarde." />}
       <Pressable style={styles.exploreHero} onPress={() => router.push('/(tabs)/auctions')}>
         <Ionicons name="hammer-outline" size={27} color="#FFF" />
         <View style={styles.flex}>
           <Text style={styles.heroTitle}>Explorar subastas</Text>
-          <Text style={styles.heroBody}>Ver catalogos y pujar</Text>
+          <Text style={styles.heroBody}>Ver catálogos y pujar</Text>
         </View>
         <Ionicons name="chevron-forward" size={18} color="#FFF" />
       </Pressable>
       <Pressable style={styles.sellHero} onPress={() => session ? router.push('/sell') : setRequiresAuth(true)}>
         <Ionicons name="add-circle-outline" size={27} color={colors.primary} />
         <View style={styles.flex}>
-          <Text style={styles.sellTitle}>Subir producto</Text>
-          <Text style={styles.heroBodyDark}>Solicita una tasacion</Text>
+          <Text style={styles.sellTitle}>Subir bien</Text>
+          <Text style={styles.heroBodyDark}>Subir bienes para subastar</Text>
         </View>
         <Ionicons name="chevron-forward" size={18} color={colors.primary} />
       </Pressable>
@@ -118,8 +118,11 @@ export function AuctionDetailScreen() {
         <Body muted>Cantidad de lotes disponibles</Body>
         <Text style={styles.bigNumber}>{auction.totalLots}</Text>
       </Card>
-      <Button label="Ver catalogo" onPress={() => router.push(`/auction/${id}/catalog`)} />
-      {auction.status === 'En vivo' ? <Button label="Ver streaming" variant="secondary" icon="radio-outline" onPress={() => router.push(`/live/${id}`)} /> : null}
+      <Button label="Ver catálogo" onPress={() => router.push(`/auction/${id}/catalog`)} />
+      {auction.status === 'En vivo' ? <>
+        <Button label="Ir a pujar" onPress={() => router.push(`/live/${id}`)} />
+        <Button label="Ver Streaming" variant="secondary" icon="radio-outline" onPress={() => router.push(`/live/${id}`)} />
+      </> : null}
     </Screen>
   );
 }
@@ -139,19 +142,19 @@ function InfoRow({ icon, label, value }: { icon: keyof typeof Ionicons.glyphMap;
 export function CatalogScreen() {
   const router = useRouter();
   const id = useId();
-  const [filter, setFilter] = useState('Todos');
+  const [filter, setFilter] = useState('Todas');
   const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['catalog', id], queryFn: () => auctionService.catalog(id) });
   const { data: auction } = useQuery({ queryKey: ['auction', id], queryFn: () => auctionService.get(id) });
   const lots = data?.filter((lot) => {
-    if (filter === 'Todos') return true;
+    if (filter === 'Todas') return true;
     const sold = lot.status?.toLowerCase() === 'vendido' || lot.status?.toLowerCase() === 'subastado';
     return filter === 'Vendidos' ? sold : !sold;
   });
   return (
     <Screen>
-      <Header title="Catalogo" subtitle={auction?.name} onBack={() => router.back()} />
+      <Header title="Catálogo" subtitle={auction?.name} onBack={() => router.back()} />
       <View style={styles.chips}>
-        {['Todos', 'Disponibles', 'Vendidos'].map((item) => <Chip key={item} label={item} active={filter === item} onPress={() => setFilter(item)} />)}
+        {['Todas', 'Disponibles', 'Vendidos'].map((item) => <Chip key={item} label={item} active={filter === item} onPress={() => setFilter(item)} />)}
       </View>
       {isLoading ? <LoadingState /> : isError ? <ErrorState onRetry={() => refetch()} /> : (
         <View style={styles.grid}>
@@ -189,7 +192,7 @@ export function LotDetailScreen() {
         <Body muted>Precio base</Body>
         <Text style={styles.price}>{formatCurrency(lot.basePrice)}</Text>
       </Card>
-      <Button label="Participar de la puja" onPress={joinLive} />
+      <Button label="Ir a pujar" onPress={joinLive} />
       <AuthRequiredModal
         visible={authModal}
         onClose={() => setAuthModal(false)}
@@ -235,7 +238,8 @@ export function LiveAuctionScreen() {
       <Card style={styles.bidPanel}>
         <Body muted>Mejor oferta actual</Body>
         <Text style={styles.offer}>{formatCurrency(data.bestBid)}</Text>
-        <Body muted>Oferta minima: {formatCurrency(data.minBid)}</Body>
+        <Body muted>Puja mínima: {formatCurrency(data.minBid)}</Body>
+        {data.maxBid != null ? <Body muted>Puja máxima: {formatCurrency(data.maxBid)}</Body> : null}
         <Input label="Tu oferta" value={amount} keyboardType="number-pad" onChangeText={setAmount} />
         {usablePayments.length ? usablePayments.map((payment) => (
           <Pressable key={payment.id} onPress={() => setPaymentId(payment.id)}>
@@ -243,12 +247,12 @@ export function LiveAuctionScreen() {
           </Pressable>
         )) : (
           <Card style={styles.noPayment}>
-            <Body muted>No tenes un medio de pago habilitado para ofertar.</Body>
+            <Body muted>No puedes pujar porque todavía no cuentas con medio de pago</Body>
             <Button label="Agregar medio de pago" variant="secondary" onPress={() => router.push('/profile/payments')} />
           </Card>
         )}
         <Button
-          label="Continuar con la puja"
+          label="Pujar"
           disabled={!paymentId || !amount.trim() || Number(amount) <= 0}
           onPress={() => router.push(`/live/${id}/confirm?amount=${encodeURIComponent(amount)}&paymentId=${encodeURIComponent(paymentId)}&itemId=${data.lot?.id}`)}
         />
@@ -309,6 +313,8 @@ export function ConfirmBidScreen() {
   if (!amount || !paymentId || !payment) return <Screen><Header title="Confirmar puja" onBack={() => router.back()} /><EmptyState title="Puja incompleta" message="Selecciona monto y medio de pago desde la subasta en vivo." /></Screen>;
   const bidError = mutation.error instanceof ApiError ? mutation.error : undefined;
   const restricted = bidError?.status === 403;
+  const restrictionMessage = bidError?.message.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') ?? '';
+  const insufficientCategory = restricted && restrictionMessage.includes('categoria');
   return (
     <Screen>
       <Header title="Confirmar puja" onBack={() => router.back()} />
@@ -322,9 +328,9 @@ export function ConfirmBidScreen() {
       {mutation.isError ? (
         <Card style={styles.restricted}>
           <Badge label={restricted ? 'Puja restringida' : 'Puja rechazada'} tone="red" />
-          <Title>{restricted ? 'No podes ofertar en este lote' : 'No pudimos registrar la oferta'}</Title>
-          <Body muted>{mutation.error instanceof Error ? mutation.error.message : 'La puja fue rechazada.'}</Body>
-          {restricted ? <Button label="Ver estado de cuenta" variant="secondary" onPress={() => router.push('/profile/account-status')} /> : null}
+          <Title>{insufficientCategory ? 'No puedes pujar' : restricted ? 'No puedes ofertar en este lote' : 'No pudimos registrar la oferta'}</Title>
+          <Body muted>{insufficientCategory ? 'Todavía no cuentas con una categoría suficiente para participar en esta subasta.' : mutation.error instanceof Error ? mutation.error.message : 'La puja fue rechazada.'}</Body>
+          {restricted && !insufficientCategory ? <Button label="Ver estado de cuenta" variant="secondary" onPress={() => router.push('/profile/account-status')} /> : null}
         </Card>
       ) : null}
       {!accepted ? <Button label={mutation.isPending ? 'Enviando...' : 'Confirmar puja'} disabled={mutation.isPending} onPress={() => mutation.mutate()} /> : (
@@ -348,13 +354,26 @@ export function ResultScreen() {
   return (
     <Screen style={styles.result}>
       <Ionicons name={data.won ? 'trophy-outline' : 'time-outline'} size={58} color={colors.primary} />
-      <Text style={styles.congrats}>{data.won ? 'Ganaste la subasta' : 'La subasta finalizo'}</Text>
+      <Text style={styles.congrats}>{data.won ? 'Ganaste la subasta' : 'La subasta finalizó'}</Text>
       <Body muted>{data.lotName}</Body>
-      {data.finalAmount != null ? <Text style={styles.resultItem}>{formatCurrency(data.finalAmount)}</Text> : null}
-      <Body muted>{data.won ? 'Consulta el pago y la entrega en Mis compras.' : 'Tu oferta no resulto ganadora.'}</Body>
+      {data.won ? <Card style={styles.total}>
+        <ResultLine label="Monto abonado" value={data.finalAmount != null ? formatCurrency(data.finalAmount) : 'A confirmar'} />
+        <ResultLine label="Medio de pago" value={data.paymentMethod ?? 'Ver en Mis compras'} />
+        <ResultLine label="Fecha" value={data.date ?? 'A confirmar'} />
+      </Card> : data.finalAmount != null ? <Text style={styles.resultItem}>{formatCurrency(data.finalAmount)}</Text> : null}
+      <Body muted>{data.won ? 'Consulta el pago y la entrega en Mis compras.' : 'Tu oferta no resultó ganadora.'}</Body>
       {data.won ? <Button label="Ir a Mis compras" onPress={() => router.push('/purchases')} /> : null}
-      <Button label="Seguir participando" variant="secondary" onPress={() => router.replace('/(tabs)/auctions')} />
+      <Button label="Seguir participando en la subasta" variant="secondary" onPress={() => router.replace(`/live/${id}`)} />
     </Screen>
+  );
+}
+
+function ResultLine({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.resultLine}>
+      <Body muted>{label}</Body>
+      <Text style={styles.resultValue}>{value}</Text>
+    </View>
   );
 }
 
@@ -418,4 +437,6 @@ const styles = StyleSheet.create({
   congrats: { color: colors.text, fontFamily: fonts.black, fontSize: 28, textAlign: 'center' },
   resultItem: { color: colors.primary, fontFamily: fonts.bold, fontSize: typography.heading },
   total: { alignSelf: 'stretch' },
+  resultLine: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.md },
+  resultValue: { color: colors.text, fontFamily: fonts.bold, fontSize: typography.body, textAlign: 'right' },
 });

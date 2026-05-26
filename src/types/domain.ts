@@ -42,6 +42,8 @@ export interface AuctionResult {
   lotName: string;
   won: boolean;
   finalAmount?: number;
+  paymentMethod?: string;
+  date?: string;
 }
 
 export interface PaymentMethod {
