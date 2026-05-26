@@ -12,7 +12,7 @@ Estados: `Implementado` = navegable y vinculado a API disponible; `Parcial` = pa
 - Se inspecciono visualmente el lienzo publico de Figma en modo lectura; se reconocieron las agrupaciones de acceso/metodos de pago, chat, puja imposible, compras, estados de cuenta y seguro.
 - La validacion pixel a pixel de cada frame sigue requiriendo abrir cada variante con datos de prueba reales en Android/Expo Web; no se incorporan mocks para forzar estados.
 - Al expirar JWT o autenticarse desde una accion de invitado, el frontend conserva el destino solicitado para continuar el flujo.
-- Inventario verificable actual: 69 frames/estados de flujo trazados en 47 rutas exportables; una misma ruta presenta variantes determinadas por el estado API.
+- Inventario verificable actual: 72 frames/estados de flujo trazados en 49 rutas exportables; una misma ruta presenta variantes determinadas por el estado API.
 
 ## Acceso, Registro Y Pago
 
@@ -81,8 +81,10 @@ Estados: `Implementado` = navegable y vinculado a API disponible; `Parcial` = pa
 | Perfil | Implementado | `/(tabs)/profile` | `GET /usuarios/me` |
 | Datos personales | Implementado | `/profile/edit` | `GET/PATCH /usuarios/me` |
 | Metricas | Implementado | `/profile/metrics` | `GET /usuarios/me/metricas` |
+| Historial de participaciones | Parcial | `/profile/history` | compras ganadas desde `GET /compras`; perdidas pendiente de endpoint |
 | Perfil multado | Implementado | `/(tabs)/profile`, banner multado; detalle en `/profile/account-status` | estado cuenta |
 | Estado de cuenta regular | Implementado | `/profile/account-status`, estado regular | estado cuenta |
+| Multas | Implementado | `/profile/account-status` | `GET /usuarios/me/estado-cuenta` |
 | Pantalla de inicio bloqueada | Implementado | `/(tabs)`, sesion con estado bloqueado | `GET /usuarios/me/estado-cuenta` |
 | Medios de pago | Implementado | `/profile/payments`, confirmacion de eliminacion | listar/eliminar |
 | Eliminar medio de pago - confirmacion | Implementado | modal en `/profile/payments` | `DELETE /usuarios/me/medios-pago/{id}` |
@@ -96,6 +98,7 @@ Estados: `Implementado` = navegable y vinculado a API disponible; `Parcial` = pa
 | Compra - detalle - envio cubierto | Implementado con PR pendiente | detalle compra con `poliza_id` | `GET /compras/{id}` |
 | Compra - detalle - listo para retirar | Implementado | `/purchases/[id]/delivery` segun `estado_entrega` | detalle compra |
 | Poliza de seguro | Implementado | `/policy/[id]` | `GET /seguros/{id}` |
+| Seguros y Polizas | Parcial | `/profile/policies` | listado derivado de compras con `poliza_id` |
 | Ampliar poliza | Implementado | `/policy/[id]/extend` | `POST /seguros/{id}/ampliar` |
 | Contacto compania | Implementado | `/policy/[id]/contact` | contacto poliza |
 | Chats | Implementado | `/(tabs)/chat` | `GET /chat/conversaciones` |

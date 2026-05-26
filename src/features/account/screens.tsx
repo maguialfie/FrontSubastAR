@@ -39,22 +39,27 @@ export function ProfileScreen() {
         <View style={styles.avatar}><Text style={styles.avatarText}>{profile.name[0]}</Text></View>
         <Title>{profile.name}</Title>
         <Body muted>{profile.email}</Body>
-        <Badge label={`Categoria ${profile.category}`} />
+        <Badge label={`Categoría ${profile.category}`} />
       </Card>
       {accountState?.status === 'Multado' ? (
         <Card style={styles.problemStatus}>
           <Badge label="Multa pendiente de pago" tone="red" />
-          <Body muted>{accountState.message ?? 'Regulariza tu cuenta para volver a participar en subastas.'}</Body>
+          <Body muted>{accountState.message ?? 'Regularizá tu cuenta para volver a participar en subastas.'}</Body>
           {accountState.penalty > 0 ? <Text style={styles.penalty}>{formatCurrency(accountState.penalty)}</Text> : null}
           <Button label="Regularizar cuenta" onPress={() => router.push('/profile/account-status')} />
         </Card>
       ) : null}
+      <SectionLabel>CUENTA</SectionLabel>
       <MenuItem icon="person-outline" label="Datos personales" onPress={() => router.push('/profile/edit')} />
-      <MenuItem icon="stats-chart-outline" label="Metricas" onPress={() => router.push('/profile/metrics')} />
-      <MenuItem icon="alert-circle-outline" label="Estado de cuenta" onPress={() => router.push('/profile/account-status')} />
-      <MenuItem icon="card-outline" label="Medios de pago" onPress={() => router.push('/profile/payments')} />
+      <MenuItem icon="time-outline" label="Historial" onPress={() => router.push('/profile/history' as Href)} />
+      <MenuItem icon="stats-chart-outline" label="Métricas" onPress={() => router.push('/profile/metrics')} />
       <MenuItem icon="cube-outline" label="Mis bienes" onPress={() => router.push('/profile/assets')} />
       <MenuItem icon="bag-check-outline" label="Mis compras" onPress={() => router.push('/purchases')} />
+      <SectionLabel>ESTADO OPERATIVO Y LEGAL</SectionLabel>
+      <MenuItem icon="card-outline" label="Medios de pago" onPress={() => router.push('/profile/payments')} />
+      <MenuItem icon="warning-outline" label="Multas" onPress={() => router.push('/profile/account-status')} />
+      <SectionLabel>GESTIÓN FINANCIERA</SectionLabel>
+      <MenuItem icon="shield-checkmark-outline" label="Seguros y Pólizas" onPress={() => router.push('/profile/policies' as Href)} />
       <Button label="Cerrar sesión" variant="ghost" onPress={async () => {
         try { await authService.logout(); } finally { await signOut(); router.replace('/welcome'); }
       }} />
@@ -74,18 +79,22 @@ function MenuItem({ icon, label, onPress }: { icon: keyof typeof Ionicons.glyphM
   );
 }
 
+function SectionLabel({ children }: { children: string }) {
+  return <Text style={styles.sectionLabel}>{children}</Text>;
+}
+
 export function MetricsScreen() {
   const router = useRouter();
   const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['metrics'], queryFn: profileService.metrics });
   if (isLoading) return <Screen><LoadingState /></Screen>;
-  if (isError || !data) return <Screen><Header title="Metricas" onBack={() => router.back()} /><ErrorState onRetry={() => refetch()} /></Screen>;
+  if (isError || !data) return <Screen><Header title="Métricas" onBack={() => router.back()} /><ErrorState onRetry={() => refetch()} /></Screen>;
   return (
     <Screen>
-      <Header title="Metricas" onBack={() => router.back()} />
+      <Header title="Métricas" onBack={() => router.back()} />
       <View style={styles.metricGrid}>
         <Metric value={String(data.participated)} label="Participadas" />
         <Metric value={String(data.won)} label="Ganadas" />
-        <Metric value={`${Math.round(data.successRate * 100)}%`} label="Tasa de exito" />
+        <Metric value={`${Math.round(data.successRate * 100)}%`} label="Tasa de éxito" />
         <Metric value={formatCurrency(data.totalPaid)} label="Total pagado" />
       </View>
       <Card>
@@ -103,6 +112,42 @@ function Metric({ value, label }: { value: string; label: string }) {
   return <Card style={styles.metric}><Text style={styles.metricValue}>{value}</Text><Body muted>{label}</Body></Card>;
 }
 
+export function ParticipationHistoryScreen() {
+  const router = useRouter();
+  const [filter, setFilter] = useState<'Todas' | 'Ganadas' | 'Perdidas'>('Todas');
+  const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['purchases', 'participation-history'], queryFn: purchaseService.list });
+  const visiblePurchases = filter === 'Perdidas' ? [] : data ?? [];
+  return (
+    <Screen>
+      <Header title="Historial de participaciones" onBack={() => router.back()} />
+      <View style={styles.filters}>
+        {(['Todas', 'Ganadas', 'Perdidas'] as const).map((item) => (
+          <Pressable key={item} style={[styles.filter, filter === item && styles.filterActive]} onPress={() => setFilter(item)}>
+            <Text style={[styles.filterText, filter === item && styles.filterTextActive]}>{item}</Text>
+          </Pressable>
+        ))}
+      </View>
+      {filter === 'Todas' ? <Card style={styles.policy}>
+        <Body muted>Por ahora se muestran participaciones ganadas asociadas a tus compras. Las demás estarán disponibles cuando la API exponga el historial completo.</Body>
+      </Card> : filter === 'Perdidas' ? <Card style={styles.policy}>
+        <Body muted>Las participaciones no ganadas estarán disponibles cuando la API exponga su historial.</Body>
+      </Card> : null}
+      {isLoading ? <LoadingState /> : isError ? <ErrorState onRetry={() => refetch()} /> : visiblePurchases.length ? visiblePurchases.map((purchase) => (
+        <Card key={purchase.id}>
+          <View style={styles.between}>
+            <Title>{purchase.lot.title}</Title>
+            <Badge label="Ganada" tone="green" />
+          </View>
+          <Body muted>{purchase.auctionName ?? 'Subasta'}</Body>
+          <SummaryLine label="Monto final" value={formatCurrency(purchase.amount)} />
+          {purchase.date ? <SummaryLine label="Fecha" value={purchase.date} /> : null}
+          <Button label="Ver compra" variant="secondary" onPress={() => router.push(`/purchases/${purchase.id}`)} />
+        </Card>
+      )) : <EmptyState title="Todavía no hay participaciones registradas" message="Cuando participes en subastas, verás tu historial acá." />}
+    </Screen>
+  );
+}
+
 export function AccountStatusScreen() {
   const router = useRouter();
   const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['account-state'], queryFn: profileService.accountState });
@@ -110,20 +155,24 @@ export function AccountStatusScreen() {
   if (isError || !data) return <Screen><Header title="Estado de cuenta" onBack={() => router.back()} /><ErrorState onRetry={() => refetch()} /></Screen>;
   const regular = data.status === 'Regular';
   const blocked = data.status === 'Bloqueado';
+  const title = regular ? 'Estado de cuenta regular' : blocked ? 'Cuenta bloqueada' : 'Cuenta multada';
+  const description = regular
+    ? 'No posees multas pendientes. Podés participar normalmente en subastas.'
+    : blocked
+      ? 'No podés operar mientras la cuenta permanezca bloqueada.'
+      : 'Tenés multas pendientes. Debés regularizarlas antes de participar en otra subasta.';
   return (
     <Screen>
       <Header title="Estado de cuenta" onBack={() => router.back()} />
       <Card style={regular ? styles.okStatus : styles.problemStatus}>
         <Ionicons name={regular ? 'checkmark-circle-outline' : blocked ? 'lock-closed-outline' : 'alert-circle-outline'} size={38} color={regular ? colors.success : colors.danger} />
-        <Title>{regular ? 'Cuenta habilitada' : blocked ? 'Cuenta bloqueada' : 'Perfil multado'}</Title>
-        <Body muted>{data.message ?? (regular ? 'Podes participar en subastas, ofertar y publicar bienes.' : 'Regulariza tu situacion para volver a pujar.')}</Body>
+        <Title>{title}</Title>
+        <Body muted>{description}</Body>
+        {data.message ? <Body muted>{data.message}</Body> : null}
         <Badge label={data.status} tone={regular ? 'green' : 'red'} />
         {data.penalty > 0 ? <Text style={styles.penalty}>{formatCurrency(data.penalty)}</Text> : null}
       </Card>
-      {!regular ? <Button label="Ver compras pendientes" onPress={() => router.push('/purchases')} /> : <Card>
-        <Text style={styles.cardTitle}>Estados contemplados</Text>
-        <Body muted>Si existe una multa pendiente o bloqueo, esta pantalla informara el monto y las acciones para regularizarlo.</Body>
-      </Card>}
+      {!regular ? <Button label="Ver compras pendientes" onPress={() => router.push('/purchases')} /> : null}
     </Screen>
   );
 }
@@ -213,7 +262,28 @@ export function PurchasesScreen() {
             <PurchaseCard key={purchase.id} purchase={purchase} onPress={() => router.push(`/purchases/${purchase.id}`)} />
           ))}
         </View>
-      ) : null) : <EmptyState title="Todavia no hay compras" message="Los lotes ganados apareceran aca." />}
+      ) : null) : <EmptyState title="Todavía no hay compras" message="Los lotes ganados aparecerán acá." />}
+    </Screen>
+  );
+}
+
+export function PoliciesScreen() {
+  const router = useRouter();
+  const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['purchases', 'policies'], queryFn: purchaseService.list });
+  const insuredPurchases = (data ?? []).filter((purchase) => !!purchase.insuranceId)
+    .filter((purchase, index, purchases) => purchases.findIndex((item) => item.insuranceId === purchase.insuranceId) === index);
+  return (
+    <Screen>
+      <Header title="Seguros y Pólizas" onBack={() => router.back()} />
+      <Body muted>Tus pólizas asociadas a compras aparecerán acá.</Body>
+      {isLoading ? <LoadingState /> : isError ? <ErrorState onRetry={() => refetch()} /> : insuredPurchases.length ? insuredPurchases.map((purchase) => (
+        <Card key={purchase.insuranceId}>
+          <Badge label="Póliza activa" tone="green" />
+          <Title>{purchase.lot.title}</Title>
+          <Body muted>{purchase.auctionName ?? 'Compra asegurada'}</Body>
+          <Button label="Ver póliza de seguro" onPress={() => router.push(`/policy/${purchase.insuranceId}`)} />
+        </Card>
+      )) : <EmptyState title="Sin pólizas asociadas" message="Tus pólizas asociadas a compras y bienes aparecerán acá." />}
     </Screen>
   );
 }
@@ -231,25 +301,26 @@ export function PurchaseDetailScreen() {
         <Title>{data.lot.title}</Title>
         <Body muted>{data.auctionName}</Body>
         <SummaryLine label="Valor pujado" value={formatCurrency(data.amount)} />
-        <SummaryLine label="Cargos y comision" value={formatCurrency(data.fee)} />
-        {data.shippingCost != null ? <SummaryLine label="Envio" value={formatCurrency(data.shippingCost)} /> : null}
+        <SummaryLine label="Cargos y comisión" value={formatCurrency(data.fee)} />
+        {data.shippingCost != null ? <SummaryLine label="Envío" value={formatCurrency(data.shippingCost)} /> : null}
         <SummaryLine label="Total" value={formatCurrency(data.total ?? data.amount + data.fee)} bold />
       </Card>
       <Card>
         <Badge label={data.deliveryStatus} tone="green" />
-        <Title>Coordinacion de entrega</Title>
-        <Body muted>{data.deliveryAddress ?? 'La direccion de entrega se informara cuando este coordinada.'}</Body>
+        <Title>Coordinación de entrega</Title>
+        <Body muted>{data.deliveryAddress ?? 'La dirección de entrega se informará cuando esté coordinada.'}</Body>
         <Button label="Ver seguimiento de entrega" variant="secondary" onPress={() => router.push(`/purchases/${id}/delivery`)} />
+        <Button label="Coordinar por Chat" variant="secondary" icon="chatbubble-ellipses-outline" onPress={() => router.push('/chat/soporte')} />
       </Card>
       {data.paymentStatus.toLowerCase() !== 'pagado' ? <Button label="Regularizar pago" onPress={() => router.push(`/purchases/${id}/payment`)} /> : null}
       <Button label="Ver factura" variant="secondary" icon="document-text-outline" onPress={() => router.push(`/purchases/${id}/invoice`)} />
       {data.insuranceId ? (
         <>
           <Card style={styles.policy}>
-            <Badge label="Envio cubierto" tone="green" />
-            <Body muted>Este lote cuenta con una poliza asociada para la cobertura informada.</Body>
+            <Badge label="Envío cubierto" tone="green" />
+            <Body muted>Este lote cuenta con una póliza asociada para la cobertura informada.</Body>
           </Card>
-          <Button label="Ver poliza de seguro" onPress={() => router.push(`/policy/${data.insuranceId}`)} />
+          <Button label="Ver póliza de seguro" onPress={() => router.push(`/policy/${data.insuranceId}`)} />
         </>
       ) : null}
     </Screen>
@@ -309,14 +380,14 @@ export function DeliveryScreen() {
   const ready = status === 'listo_para_retirar';
   const moving = status === 'en_camino';
   const delivered = status === 'entregado';
-  const title = ready ? 'Listo para retirar' : moving ? 'Envio en camino' : delivered ? 'Entrega completada' : 'Coordinacion de entrega';
+  const title = ready ? 'Listo para retirar' : moving ? 'Envío en camino' : delivered ? 'Entrega completada' : 'Coordinación de entrega';
   const text = ready
-    ? data.deliveryAddress ?? 'Acercate al deposito indicado con tu comprobante de compra.'
+    ? data.deliveryAddress ?? 'Acercate al depósito indicado con tu comprobante de compra.'
     : moving
-      ? 'Tu lote se encuentra en traslado. Recibiras novedades cuando llegue a destino.'
+      ? 'Tu lote se encuentra en traslado. Recibirás novedades cuando llegue a destino.'
       : delivered
         ? 'La entrega fue registrada correctamente.'
-        : data.deliveryAddress ?? 'Estamos coordinando la direccion y modalidad de entrega.';
+        : data.deliveryAddress ?? 'Estamos coordinando la dirección y modalidad de entrega.';
   return (
     <Screen>
       <Header title="Entrega" onBack={() => router.back()} />
@@ -328,11 +399,12 @@ export function DeliveryScreen() {
       </Card>
       {data.insuranceId ? (
         <Card style={styles.policy}>
-          <Badge label="Envio cubierto" tone="green" />
-          <Body muted>La cobertura asociada al lote acompana esta entrega.</Body>
-          <Button label="Ver poliza" variant="secondary" onPress={() => router.push(`/policy/${data.insuranceId}`)} />
+          <Badge label="Envío cubierto" tone="green" />
+          <Body muted>La cobertura asociada al lote acompaña esta entrega.</Body>
+          <Button label="Ver póliza" variant="secondary" onPress={() => router.push(`/policy/${data.insuranceId}`)} />
         </Card>
       ) : null}
+      <Button label="Coordinar por Chat" variant="secondary" icon="chatbubble-ellipses-outline" onPress={() => router.push('/chat/soporte')} />
       <Button label="Volver al detalle" onPress={() => router.back()} />
     </Screen>
   );
@@ -367,14 +439,14 @@ export function PolicyScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['policy', id], queryFn: () => insuranceService.get(id ?? '') });
   if (isLoading) return <Screen><LoadingState /></Screen>;
-  if (isError || !data) return <Screen><Header title="Poliza de seguro" onBack={() => router.back()} /><ErrorState onRetry={() => refetch()} /></Screen>;
+  if (isError || !data) return <Screen><Header title="Póliza de seguro" onBack={() => router.back()} /><ErrorState onRetry={() => refetch()} /></Screen>;
   return (
     <Screen>
-      <Header title="Poliza de seguro" onBack={() => router.back()} />
+      <Header title="Póliza de seguro" onBack={() => router.back()} />
       <Card style={styles.policy}>
         <Ionicons name="shield-checkmark-outline" size={36} color={colors.primary} />
         <Title>{data.company}</Title>
-        <Body muted>Poliza {data.number} - Vigente hasta {data.validUntil ?? 'sin fecha informada'}</Body>
+        <Body muted>Póliza {data.number} - Vigente hasta {data.validUntil ?? 'sin fecha informada'}</Body>
         <SummaryLine label="Valor asegurado" value={formatCurrency(data.insuredValue)} bold />
         <SummaryLine label="Cobertura" value={data.coverage ?? 'Sin detalle'} />
       </Card>
@@ -384,7 +456,7 @@ export function PolicyScreen() {
       </Card>
       <Card>
         <Text style={styles.cardTitle}>Contacto aseguradora</Text>
-        <Body muted>{data.contact?.phone ?? 'Telefono no informado'}</Body>
+        <Body muted>{data.contact?.phone ?? 'Teléfono no informado'}</Body>
         <Body muted>{data.contact?.email ?? 'Correo no informado'}</Body>
       </Card>
       <Button label="Ampliar cobertura" onPress={() => router.push(`/policy/${id}/extend` as Href)} />
@@ -404,14 +476,14 @@ export function ExtendPolicyScreen() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['policy', id] }),
   });
   if (isLoading) return <Screen><LoadingState /></Screen>;
-  if (isError || !data) return <Screen><Header title="Ampliar poliza" onBack={() => router.back()} /><ErrorState onRetry={() => refetch()} /></Screen>;
+  if (isError || !data) return <Screen><Header title="Ampliar póliza" onBack={() => router.back()} /><ErrorState onRetry={() => refetch()} /></Screen>;
   return (
     <Screen>
-      <Header title="Ampliar poliza" onBack={() => router.back()} />
+      <Header title="Ampliar póliza" onBack={() => router.back()} />
       <Card style={styles.policy}>
         <Title>Solicitar mayor cobertura</Title>
         <SummaryLine label="Cobertura actual" value={formatCurrency(data.insuredValue)} bold />
-        <Body muted>Ingresa un valor superior al actual para solicitar la ampliacion.</Body>
+        <Body muted>Ingresá un valor superior al actual para solicitar la ampliación.</Body>
       </Card>
       <Input label="Nuevo valor asegurado" keyboardType="number-pad" value={newValue} onChangeText={setNewValue} />
       <Button label={extend.isPending ? 'Solicitando...' : 'Confirmar solicitud'} disabled={!newValue || Number(newValue) <= data.insuredValue || extend.isPending} onPress={() => extend.mutate()} />
@@ -426,21 +498,21 @@ export function PolicyContactScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['policy', id], queryFn: () => insuranceService.get(id ?? '') });
   if (isLoading) return <Screen><LoadingState /></Screen>;
-  if (isError || !data) return <Screen><Header title="Contacto compania" onBack={() => router.back()} /><ErrorState onRetry={() => refetch()} /></Screen>;
+  if (isError || !data) return <Screen><Header title="Contacto compañía" onBack={() => router.back()} /><ErrorState onRetry={() => refetch()} /></Screen>;
   return (
     <Screen>
-      <Header title="Contacto compania" onBack={() => router.back()} />
+      <Header title="Contacto compañía" onBack={() => router.back()} />
       <Card style={styles.policy}>
         <Ionicons name="shield-checkmark-outline" size={36} color={colors.primary} />
         <Title>{data.company}</Title>
-        <Body muted>Poliza {data.number}</Body>
+        <Body muted>Póliza {data.number}</Body>
       </Card>
       <Card>
-        <SummaryLine label="Telefono" value={data.contact?.phone ?? 'No informado'} />
+        <SummaryLine label="Teléfono" value={data.contact?.phone ?? 'No informado'} />
         <SummaryLine label="Correo" value={data.contact?.email ?? 'No informado'} />
         <SummaryLine label="Web" value={data.contact?.web ?? 'No informada'} />
       </Card>
-      <Button label="Volver a la poliza" onPress={() => router.back()} />
+      <Button label="Volver a la póliza" onPress={() => router.back()} />
     </Screen>
   );
 }
@@ -453,15 +525,17 @@ export function ChatsScreen() {
     <Screen>
       <Header title="Chats" />
       {!session ? <GuestNotice /> : isLoading ? <LoadingState /> : isError ? <ErrorState onRetry={() => refetch()} /> : data?.length ? data.map((chat) => (
-        <Card key={chat.id} style={styles.chatRow}>
+        <Pressable key={chat.id} onPress={() => router.push(`/chat/${chat.id}`)}>
+        <Card style={styles.chatRow}>
           <View style={styles.chatIcon}><Ionicons name="chatbubble-outline" size={20} color={colors.primary} /></View>
           <View style={styles.flex}>
             <Text style={styles.cardTitle}>{chat.name}</Text>
             <Body muted>{chat.lastMessage}</Body>
           </View>
           {chat.unread ? <Badge label={String(chat.unread)} /> : null}
-          <Ionicons name="chevron-forward" size={18} color={colors.textMuted} onPress={() => router.push(`/chat/${chat.id}`)} />
+          <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
         </Card>
+        </Pressable>
       )) : <EmptyState title="Sin conversaciones" message="Tus consultas y notificaciones apareceran aca." />}
     </Screen>
   );
@@ -477,7 +551,7 @@ export function ConversationScreen() {
     mutationFn: () => chatService.send(id ?? 'bot', message),
     onSuccess: () => { setMessage(''); queryClient.invalidateQueries({ queryKey: ['messages', id] }); },
   });
-  const title = id === 'soporte' ? 'Soporte SubastAR' : id === 'poliza' ? 'Consultas de seguro' : 'Asistente SubastAR';
+  const title = id === 'soporte' ? 'Soporte SubastAR' : id === 'poliza' ? 'Póliza de seguro' : 'Asistente SubastAR';
   return (
     <Screen>
       <Header title={title} onBack={() => router.back()} />
@@ -488,7 +562,7 @@ export function ConversationScreen() {
         </View>
       ))}
       <View style={styles.compose}>
-        <Input placeholder="Escribe tu consulta..." value={message} onChangeText={setMessage} />
+        <Input placeholder="Escribí tu consulta..." value={message} onChangeText={setMessage} />
         <Button label={send.isPending ? 'Enviando...' : 'Enviar'} disabled={!message.trim() || send.isPending} onPress={() => send.mutate()} />
       </View>
       {send.isError ? <Body muted>{send.error instanceof Error ? send.error.message : 'No fue posible enviar el mensaje.'}</Body> : null}
@@ -511,11 +585,12 @@ export function EditProfileScreen() {
   return (
     <Screen>
       <Header title="Datos personales" onBack={() => router.back()} />
-      <Title>{data.name}</Title>
+      <Input label="Nombre y apellido" value={data.name} editable={false} />
       <Input label="Email" value={data.email} editable={false} />
       <Input label="DNI" value={data.dni ?? ''} editable={false} />
-      <Input label="Domicilio" value={address || (data.address ?? '')} onChangeText={setAddress} />
-      <Input label="Pais de origen" value={country || (data.country ?? '')} onChangeText={setCountry} />
+      <Input label="Categoría" value={data.category ?? ''} editable={false} />
+      <Input label="Dirección" value={address || (data.address ?? '')} onChangeText={setAddress} />
+      <Input label="País de origen" value={country || (data.country ?? '')} onChangeText={setCountry} />
       <Button label={save.isPending ? 'Guardando...' : 'Guardar cambios'} disabled={save.isPending} onPress={() => save.mutate()} />
       {save.isError ? <Body muted>{save.error instanceof Error ? save.error.message : 'No fue posible guardar.'}</Body> : null}
     </Screen>
@@ -629,8 +704,8 @@ export function AssetDetailScreen() {
         <Title>{data.title}</Title>
         <Body muted>{data.detail}</Body>
         {data.basePrice != null ? <SummaryLine label="Precio base" value={formatCurrency(data.basePrice)} /> : null}
-        {data.commission != null ? <SummaryLine label="Comision" value={formatCurrency(data.commission)} /> : null}
-        {data.depositLocation ? <SummaryLine label="Deposito" value={data.depositLocation} /> : null}
+        {data.commission != null ? <SummaryLine label="Comisión" value={formatCurrency(data.commission)} /> : null}
+        {data.depositLocation ? <SummaryLine label="Depósito" value={data.depositLocation} /> : null}
       </Card>
       {data.status === 'Aceptado' ? <>
         <Button label="Aceptar condiciones" onPress={() => accept.mutate(true)} />
@@ -649,6 +724,7 @@ const styles = StyleSheet.create({
   avatarText: { fontFamily: fonts.black, fontSize: 28, color: colors.primary },
   menuItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.md },
   menuText: { flex: 1, color: colors.text, fontFamily: fonts.medium },
+  sectionLabel: { color: colors.textMuted, fontSize: typography.small, fontFamily: fonts.bold, textTransform: 'uppercase', marginTop: spacing.sm },
   metricGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
   metric: { width: '47%' },
   metricValue: { color: colors.primary, fontFamily: fonts.black, fontSize: typography.heading },
@@ -669,7 +745,6 @@ const styles = StyleSheet.create({
   filterText: { color: colors.textMuted, fontFamily: fonts.medium, fontSize: typography.small },
   filterTextActive: { color: colors.primary },
   purchaseSection: { gap: spacing.md },
-  sectionLabel: { color: colors.textMuted, fontSize: typography.small, fontFamily: fonts.bold, textTransform: 'uppercase' },
   chatRow: { flexDirection: 'row', alignItems: 'center' },
   paymentRow: { gap: spacing.xs },
   chatIcon: { width: 42, height: 42, backgroundColor: colors.primarySoft, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
