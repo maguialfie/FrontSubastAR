@@ -220,9 +220,11 @@ export const authService = {
 export const auctionService = {
   async list(filters?: { search?: string; status?: string; category?: string; currency?: string }): Promise<Auction[]> {
     const params = new URLSearchParams();
+    const statusValue = { 'En vivo': 'en_vivo', 'Próximas': 'proxima', Finalizada: 'finalizada' }[filters?.status ?? ''];
+    const categoryValue = { Oro: 'oro', Platino: 'platino', Plata: 'plata', Especial: 'especial', 'Común': 'comun' }[filters?.category ?? ''];
     if (filters?.search) params.set('busqueda', filters.search);
-    if (filters?.status && filters.status !== 'Todas') params.set('estado', filters.status === 'En vivo' ? 'en_vivo' : filters.status.toLowerCase());
-    if (filters?.category && filters.category !== 'Todas') params.set('categoria', filters.category);
+    if (statusValue) params.set('estado', statusValue);
+    if (categoryValue) params.set('categoria', categoryValue);
     if (filters?.currency && filters.currency !== 'Todas') params.set('moneda', filters.currency);
     return (await request<BackendAuction[]>(`${apiRoutes.auctions}?${params.toString()}`)).map(mapAuction);
   },

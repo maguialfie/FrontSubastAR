@@ -18,8 +18,8 @@ function GuestNotice() {
     <Card style={styles.notice}>
       <Ionicons name="lock-closed-outline" size={28} color={colors.primary} />
       <Title>Area personal</Title>
-      <Body muted>Inicia sesion para acceder a esta seccion.</Body>
-      <Button label="Iniciar sesion" onPress={() => router.push('/login')} />
+      <Body muted>Iniciá sesión para acceder a esta sección.</Body>
+      <Button label="Iniciar sesión" onPress={() => router.push('/login')} />
     </Card>
   );
 }
@@ -55,7 +55,7 @@ export function ProfileScreen() {
       <MenuItem icon="card-outline" label="Medios de pago" onPress={() => router.push('/profile/payments')} />
       <MenuItem icon="cube-outline" label="Mis bienes" onPress={() => router.push('/profile/assets')} />
       <MenuItem icon="bag-check-outline" label="Mis compras" onPress={() => router.push('/purchases')} />
-      <Button label="Cerrar sesion" variant="ghost" onPress={async () => {
+      <Button label="Cerrar sesión" variant="ghost" onPress={async () => {
         try { await authService.logout(); } finally { await signOut(); router.replace('/welcome'); }
       }} />
     </Screen>
@@ -150,7 +150,7 @@ export function PaymentsScreen() {
         </View>
       )) : <EmptyState title="Sin medios de pago" message="Agrega uno para participar de una puja." />}
       <Title>Agregar medio</Title>
-      <Button label="Tarjeta de credito" variant="secondary" onPress={() => router.push({ pathname: '/profile/payments/add', params: { type: 'tarjeta_credito' } })} />
+      <Button label="Tarjeta de crédito" variant="secondary" onPress={() => router.push({ pathname: '/profile/payments/add', params: { type: 'tarjeta_credito' } })} />
       <Button label="Cuenta bancaria" variant="secondary" onPress={() => router.push({ pathname: '/profile/payments/add', params: { type: 'cuenta_bancaria' } })} />
       <Button label="Cheque certificado" variant="secondary" onPress={() => router.push({ pathname: '/profile/payments/add', params: { type: 'cheque_certificado' } })} />
       <ConfirmationModal
@@ -543,7 +543,10 @@ export function PaymentAddScreen() {
       securityCode: security, holderDni: dni, issuerBank: bank, certifiedAmount: amount,
       chequeNumber: kind === 'cheque_certificado' ? identifier : undefined, chequePhoto: photo,
     }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['payments'] }); router.replace(onboarding ? { pathname: '/payment-success', params: { returnTo, type: kind } } : '/profile/payments'); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
+      router.replace({ pathname: '/payment-success', params: { returnTo, type: kind, onboarding: onboarding ?? 'false' } });
+    },
   });
   async function pickCheque() {
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.7 });
@@ -552,7 +555,8 @@ export function PaymentAddScreen() {
       setPhoto({ uri: asset.uri, name: asset.fileName ?? 'cheque.jpg', type: asset.mimeType ?? 'image/jpeg', file: asset.file });
     }
   }
-  const label = kind === 'tarjeta_credito' ? 'Tarjeta de credito' : kind === 'cuenta_bancaria' ? 'Cuenta bancaria' : 'Cheque certificado';
+  const label = kind === 'tarjeta_credito' ? 'Tarjeta de crédito' : kind === 'cuenta_bancaria' ? 'Cuenta bancaria' : 'Cheque certificado';
+  const submitLabel = kind === 'cuenta_bancaria' ? 'Agregar cuenta' : kind === 'tarjeta_credito' ? 'Agregar tarjeta' : 'Agregar cheque';
   const canSave = kind === 'tarjeta_credito'
     ? !!identifier && !!holder && !!dni && !!expiry && !!security
     : kind === 'cuenta_bancaria'
@@ -562,17 +566,24 @@ export function PaymentAddScreen() {
     <Screen>
       <Header title={label} onBack={() => router.back()} />
       <Title>Agregar {label.toLowerCase()}</Title>
-      {kind !== 'tarjeta_credito' ? <Input label="Banco" value={bank} onChangeText={setBank} /> : null}
-      {kind === 'cuenta_bancaria' ? <Input label="Pais del banco" value={country} onChangeText={setCountry} /> : null}
-      <Input label={kind === 'tarjeta_credito' ? 'Numero de tarjeta' : kind === 'cuenta_bancaria' ? 'CBU / IBAN' : 'Numero de cheque'} value={identifier} onChangeText={setIdentifier} />
+      {onboarding === 'true' ? <Button label="Omitir por ahora" variant="ghost" onPress={() => router.replace((returnTo || '/(tabs)') as Href)} /> : null}
+      {kind !== 'tarjeta_credito' ? <Input label="Nombre del banco" value={bank} onChangeText={setBank} /> : null}
+      {kind === 'cuenta_bancaria' ? <Input label="País del banco" value={country} onChangeText={setCountry} /> : null}
       {kind === 'tarjeta_credito' ? <>
+        <Input label="Número de tarjeta" value={identifier} onChangeText={setIdentifier} />
         <Input label="Titular" value={holder} onChangeText={setHolder} />
         <Input label="DNI titular" value={dni} onChangeText={setDni} />
         <Input label="Vencimiento" value={expiry} onChangeText={setExpiry} />
-        <Input label="Codigo de seguridad" secureTextEntry value={security} onChangeText={setSecurity} />
-      </> : <Input label={kind === 'cuenta_bancaria' ? 'Fondos reservados' : 'Monto certificado'} value={amount} keyboardType="number-pad" onChangeText={setAmount} />}
-      {kind === 'cheque_certificado' ? <Button label={photo ? 'Foto cargada' : 'Fotografiar cheque'} variant="secondary" onPress={pickCheque} /> : null}
-      <Button label={save.isPending ? 'Guardando...' : 'Guardar medio de pago'} disabled={!canSave || save.isPending} onPress={() => save.mutate()} />
+        <Input label="Código de seguridad" secureTextEntry value={security} onChangeText={setSecurity} />
+      </> : kind === 'cuenta_bancaria' ? <>
+        <Input label="Fondos reservados para subasta" value={amount} keyboardType="number-pad" onChangeText={setAmount} />
+        <Input label="CBU/IBAN/Número de cuenta" value={identifier} onChangeText={setIdentifier} />
+      </> : <>
+        <Input label="Número de cheque" value={identifier} onChangeText={setIdentifier} />
+        <Input label="Monto certificado" value={amount} keyboardType="number-pad" onChangeText={setAmount} />
+      </>}
+      {kind === 'cheque_certificado' ? <Button label={photo ? 'Foto cargada' : 'Subir foto del cheque'} variant="secondary" onPress={pickCheque} /> : null}
+      <Button label={save.isPending ? 'Guardando...' : submitLabel} disabled={!canSave || save.isPending} onPress={() => save.mutate()} />
       {save.isError ? <Body muted>{save.error instanceof Error ? save.error.message : 'No fue posible agregar el medio.'}</Body> : null}
     </Screen>
   );
@@ -580,14 +591,18 @@ export function PaymentAddScreen() {
 
 export function PaymentSuccessScreen() {
   const router = useRouter();
-  const { returnTo, type } = useLocalSearchParams<{ returnTo?: string; type?: PaymentMethodKind }>();
+  const { onboarding, returnTo, type } = useLocalSearchParams<{ onboarding?: string; returnTo?: string; type?: PaymentMethodKind }>();
   const chequePending = type === 'cheque_certificado';
   return (
     <Screen style={styles.successScreen}>
       <Ionicons name={chequePending ? 'time-outline' : 'checkmark-circle-outline'} size={58} color={chequePending ? colors.primary : colors.success} />
-      <Title>{chequePending ? 'Cheque enviado a revision' : 'Medio de pago agregado'}</Title>
-      <Body muted>{chequePending ? 'Validaremos la documentacion. El cheque se habilitara para pujas cuando sea aprobado.' : 'Ya podes utilizarlo para participar en las subastas disponibles.'}</Body>
-      <Button label={returnTo ? 'Continuar' : 'Ir al inicio'} onPress={() => router.replace((returnTo || '/(tabs)') as Href)} />
+      <Title>{chequePending ? 'Cheque enviado a revisión' : '¡Se agregó el medio de pago exitosamente!'}</Title>
+      <Body muted>{chequePending ? 'Validaremos la documentación. El cheque se habilitará para pujas cuando sea aprobado.' : 'Ya podés utilizarlo para participar en las subastas disponibles.'}</Body>
+      <Button
+        label="Agregar otro medio de pago"
+        onPress={() => router.replace(onboarding === 'true' ? { pathname: '/onboarding-payment', params: { returnTo } } : '/profile/payments')}
+      />
+      <Button label="Volver" variant="secondary" onPress={() => router.replace((returnTo || '/(tabs)') as Href)} />
     </Screen>
   );
 }

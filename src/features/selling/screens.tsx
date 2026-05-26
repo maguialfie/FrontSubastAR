@@ -30,9 +30,10 @@ function WizardHeader({ current }: { current: number }) {
 
 export function SellStartScreen() {
   const router = useRouter();
-  const [category, setCategory] = useState('obra_arte');
+  const [category, setCategory] = useState('');
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [amount, setAmount] = useState('1');
   const [artist, setArtist] = useState('');
   const [date, setDate] = useState('');
   const [period, setPeriod] = useState('');
@@ -42,67 +43,78 @@ export function SellStartScreen() {
     mutationFn: async () => {
       const request = await assetService.start(category);
       await assetService.saveDetails(request.code, {
-        type: category, name, technicalDescription: description, amount: 1, artistDesigner: artist || undefined,
+        type: category, name, technicalDescription: description, amount: Number(amount), artistDesigner: artist || undefined,
         originPeriod: period || undefined, creationDate: date || undefined, history: history || undefined,
         additionalInformation: additional || undefined,
       });
       return request.code;
     },
-    onSuccess: (code) => router.push({ pathname: '/sell/photos', params: { code, name, type: category } }),
+    onSuccess: (code) => router.push({ pathname: '/sell/photos', params: { code, name, type: category, amount } }),
   });
   return (
     <Screen>
-      <Header title="Subir producto" onBack={() => router.back()} />
-      <WizardHeader current={0} />
-      <Title>Datos del bien</Title>
-      <Body muted>Selecciona una categoria y completa la informacion necesaria para tasarlo.</Body>
+      <Header title="Subir bien" onBack={() => router.back()} />
+      <Title>Categoría del bien</Title>
       <View style={styles.categories}>
-        {[{ value: 'obra_arte', label: 'Obra de arte' }, { value: 'objeto_disenador', label: 'Disenador' }, { value: 'otro', label: 'Otros' }].map((item) => (
+        {[
+          { value: 'obra_arte', label: 'Obras de arte', description: 'Pinturas, esculturas y diseños autorales' },
+          { value: 'objeto_disenador', label: 'Objetos de diseñador', description: 'Muebles, accesorios y piezas exclusivas' },
+          { value: 'otro', label: 'Otros', description: 'Juegos, sets, joyas y más' },
+        ].map((item) => (
           <Pressable onPress={() => setCategory(item.value)} key={item.value} style={[styles.category, item.value === category && styles.categoryActive]}>
             <Ionicons name={item.value === 'obra_arte' ? 'color-palette-outline' : item.value === 'objeto_disenador' ? 'diamond-outline' : 'cube-outline'} size={23} color={colors.primary} />
-            <Text style={styles.categoryText}>{item.label}</Text>
+            <View style={styles.categoryCopy}>
+              <Text style={styles.categoryText}>{item.label}</Text>
+              <Text style={styles.categoryDescription}>{item.description}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.primary} />
           </Pressable>
         ))}
       </View>
-      <Input label="Nombre del bien" placeholder="Ej. Retrato en oleo" value={name} onChangeText={setName} />
-      <Input label="Descripcion tecnica" placeholder="Materiales, medidas y estado" multiline value={description} onChangeText={setDescription} />
-      {category === 'obra_arte' ? <>
-        <Input label="Artista" value={artist} onChangeText={setArtist} />
-        <Input label="Fecha de creacion (AAAA-MM-DD)" value={date} onChangeText={setDate} />
-        <Input label="Epoca u origen" value={period} onChangeText={setPeriod} />
-        <Input label="Historia y procedencia" multiline value={history} onChangeText={setHistory} />
+      {category ? <>
+        <WizardHeader current={0} />
+        <Title>Datos del bien</Title>
+        <Input label="Nombre del bien" placeholder="Ej. Retrato en óleo" value={name} onChangeText={setName} />
+        <Input label="Descripción técnica" placeholder="Materiales, medidas y estado" multiline value={description} onChangeText={setDescription} />
+        <Input label="Cantidad de elementos *" keyboardType="number-pad" value={amount} onChangeText={setAmount} />
+        {category === 'obra_arte' ? <>
+          <Input label="Artista" value={artist} onChangeText={setArtist} />
+          <Input label="Fecha de creación (AAAA-MM-DD)" value={date} onChangeText={setDate} />
+          <Input label="Época u origen" value={period} onChangeText={setPeriod} />
+          <Input label="Historia y procedencia" multiline value={history} onChangeText={setHistory} />
+        </> : null}
+        {category === 'objeto_disenador' ? <>
+          <Input label="Diseñador" value={artist} onChangeText={setArtist} />
+          <Input label="Fecha de creación (AAAA-MM-DD)" value={date} onChangeText={setDate} />
+        </> : null}
+        {category === 'otro' ? <Input label="Información adicional" value={additional} onChangeText={setAdditional} /> : null}
+        <Button label={save.isPending ? 'Guardando...' : 'Continuar con fotografías'} disabled={!name || !description || Number(amount) <= 0 || save.isPending} onPress={() => save.mutate()} />
+        {save.isError ? <Body muted>{save.error instanceof Error ? save.error.message : 'No fue posible iniciar la solicitud.'}</Body> : null}
       </> : null}
-      {category === 'objeto_disenador' ? <>
-        <Input label="Disenador" value={artist} onChangeText={setArtist} />
-        <Input label="Fecha de creacion (AAAA-MM-DD)" value={date} onChangeText={setDate} />
-      </> : null}
-      {category === 'otro' ? <Input label="Informacion adicional" value={additional} onChangeText={setAdditional} /> : null}
-      <Button label={save.isPending ? 'Guardando...' : 'Continuar con fotografias'} disabled={!name || !description || save.isPending} onPress={() => save.mutate()} />
-      {save.isError ? <Body muted>{save.error instanceof Error ? save.error.message : 'No fue posible iniciar la solicitud.'}</Body> : null}
     </Screen>
   );
 }
 
 export function SellPhotosScreen() {
   const router = useRouter();
-  const { code, name, type } = useLocalSearchParams<{ code: string; name: string; type: string }>();
+  const { amount, code, name, type } = useLocalSearchParams<{ amount: string; code: string; name: string; type: string }>();
   const [photos, setPhotos] = useState<FileUpload[]>([]);
   const upload = useMutation({
     mutationFn: () => assetService.uploadPhotos(code ?? '', photos),
-    onSuccess: () => router.push({ pathname: '/sell/documents', params: { code, name, type, photos: String(photos.length) } }),
+    onSuccess: () => router.push({ pathname: '/sell/documents', params: { amount, code, name, type, photos: String(photos.length) } }),
   });
   async function addPhoto() {
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsMultipleSelection: true, quality: 0.7 });
     if (!result.canceled) setPhotos((current) => [...current, ...result.assets.map((asset, index) => ({
       uri: asset.uri, name: asset.fileName ?? `bien-${index}.jpg`, type: asset.mimeType ?? 'image/jpeg', file: asset.file,
-    }))].slice(0, 6));
+    }))].slice(0, 8));
   }
   return (
     <Screen>
-      <Header title="Fotografias" onBack={() => router.back()} />
+      <Header title="Fotografías" onBack={() => router.back()} />
       <WizardHeader current={1} />
-      <Title>Carga imagenes</Title>
-      <Body muted>Agrega 6 fotos nitidas del bien y sus detalles.</Body>
+      <Title>Cargá imágenes</Title>
+      <Body muted>Mínimo 6 fotos y máximo 8 fotos requeridas.</Body>
       <View style={styles.gallery}>
         {photos.map((file) => (
           <View key={file.uri} style={styles.previewWrap}>
@@ -117,7 +129,7 @@ export function SellPhotosScreen() {
           <Text style={styles.addText}>Agregar</Text>
         </Pressable>
       </View>
-      <Badge label={`${photos.length} de 6 fotos cargadas`} tone={photos.length >= 6 ? 'green' : 'yellow'} />
+      <Badge label={`${photos.length} de 8 fotos cargadas`} tone={photos.length >= 6 ? 'green' : 'yellow'} />
       <Button label={upload.isPending ? 'Subiendo...' : 'Continuar'} disabled={photos.length < 6 || upload.isPending} onPress={() => upload.mutate()} />
       {upload.isError ? <Body muted>{upload.error instanceof Error ? upload.error.message : 'No fue posible subir las fotos.'}</Body> : null}
     </Screen>
@@ -126,9 +138,9 @@ export function SellPhotosScreen() {
 
 export function SellDocumentsScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ code: string; name: string; type: string; photos: string }>();
+  const params = useLocalSearchParams<{ amount: string; code: string; name: string; type: string; photos: string }>();
   const [documents, setDocuments] = useState<FileUpload[]>([]);
-  const [declaration, setDeclaration] = useState(true);
+  const [declaration, setDeclaration] = useState(false);
   const upload = useMutation({
     mutationFn: () => assetService.uploadDocuments(params.code ?? '', declaration, documents),
     onSuccess: () => router.push({ pathname: '/sell/review', params: { ...params, documents: String(documents.length) } }),
@@ -139,15 +151,16 @@ export function SellDocumentsScreen() {
   }
   return (
     <Screen>
-      <Header title="Documentacion" onBack={() => router.back()} />
+      <Header title="Documentación" onBack={() => router.back()} />
       <WizardHeader current={2} />
-      <Title>Declara propiedad</Title>
+      <Title>Declaración de propiedad *</Title>
       <Pressable onPress={() => setDeclaration((current) => !current)}>
       <Card style={styles.declaration}>
         <Ionicons name={declaration ? 'checkmark-circle' : 'ellipse-outline'} color={colors.primary} size={22} />
-        <Body>Declaro ser propietario legitimo del bien presentado.</Body>
+        <Body>Declaro que el bien ofrecido para subasta es de mi exclusiva propiedad y que no se encuentra sujeto a ningún impedimento legal que restrinja su disposición.</Body>
       </Card>
       </Pressable>
+      <Text style={styles.documentTitle}>Documentación preventiva (opcional)</Text>
       <Pressable style={styles.documentPicker} onPress={addDocument}>
         <Ionicons name="document-attach-outline" size={28} color={colors.primary} />
         <Text style={styles.documentTitle}>Adjuntar comprobantes</Text>
@@ -161,35 +174,36 @@ export function SellDocumentsScreen() {
           </Pressable>
         </Card>
       ))}
-      <Button label={upload.isPending ? 'Guardando...' : 'Revisar solicitud'} disabled={!declaration || upload.isPending} onPress={() => upload.mutate()} />
-      {upload.isError ? <Body muted>{upload.error instanceof Error ? upload.error.message : 'No fue posible cargar documentacion.'}</Body> : null}
+      <Button label={upload.isPending ? 'Guardando...' : 'Siguiente'} disabled={!declaration || upload.isPending} onPress={() => upload.mutate()} />
+      {upload.isError ? <Body muted>{upload.error instanceof Error ? upload.error.message : 'No fue posible cargar documentación.'}</Body> : null}
     </Screen>
   );
 }
 
 export function SellReviewScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ code: string; name: string; type: string; photos: string; documents: string }>();
+  const params = useLocalSearchParams<{ amount: string; code: string; name: string; type: string; photos: string; documents: string }>();
   const confirm = useMutation({
     mutationFn: () => assetService.confirm(params.code ?? ''),
     onSuccess: (response) => router.replace({ pathname: '/sell/success', params: { code: response.codigo_solicitud, status: response.estado } }),
   });
   return (
     <Screen>
-      <Header title="Confirmacion" onBack={() => router.back()} />
+      <Header title="Confirmar" onBack={() => router.back()} />
       <WizardHeader current={3} />
-      <Title>Revisa tus datos</Title>
+      <Title>Datos del bien</Title>
       <Card>
-        <Badge label={params.type === 'obra_arte' ? 'Obra de arte' : params.type === 'objeto_disenador' ? 'Objeto de disenador' : 'Otro'} />
+        <Badge label={params.type === 'obra_arte' ? 'Obra de arte' : params.type === 'objeto_disenador' ? 'Objeto de diseñador' : 'Otro'} />
         <Title>{params.name}</Title>
-        <Body muted>Descripcion tecnica y documentos preparados para evaluacion.</Body>
-        <Summary label="Fotografias" value={`${params.photos} archivos`} />
-        <Summary label="Propiedad" value="Declarada" />
-        <Summary label="Documentos" value={`${params.documents} adjuntos`} />
+        <Summary label="Cantidad de elementos" value={params.amount ?? '-'} />
+        <Summary label="Fotos cargadas" value={`${params.photos} archivos`} />
+        <Summary label="Documentación" value={`${params.documents} adjuntos`} />
+        <Summary label="Declaración de propiedad" value="Aceptada" />
       </Card>
-      <Button label={confirm.isPending ? 'Enviando...' : 'Enviar solicitud'} disabled={confirm.isPending} onPress={() => confirm.mutate()} />
+      <Button label={confirm.isPending ? 'Enviando...' : 'Confirmar'} disabled={confirm.isPending} onPress={() => confirm.mutate()} />
       {confirm.isError ? <Body muted>{confirm.error instanceof Error ? confirm.error.message : 'No fue posible enviar la solicitud.'}</Body> : null}
-      <Button label="Volver a editar" variant="ghost" onPress={() => router.back()} />
+      <Button label="Editar bien" variant="secondary" onPress={() => router.back()} />
+      <Button label="Cancelar" variant="ghost" onPress={() => router.replace('/(tabs)')} />
     </Screen>
   );
 }
@@ -204,14 +218,15 @@ export function SellSuccessScreen() {
   return (
     <Screen style={styles.success}>
       <Ionicons name="checkmark-circle-outline" size={58} color={colors.success} />
-      <Title>Solicitud enviada</Title>
-      <Body muted>Tu bien fue recibido y sera evaluado por nuestro equipo.</Body>
+      <Title>¡Solicitud enviada exitosamente!</Title>
+      <Body muted>Tu bien fue enviado para revisión. Te notificaremos cuando la empresa complete la inspección y te informaremos la fecha, valor base y comisiones.</Body>
       <Card style={styles.fullWidth}>
-        <Summary label="Codigo de solicitud" value={code ?? '-'} />
-        <Summary label="Estado" value={status ?? 'Pendiente de revision'} />
+        <Summary label="Código de solicitud" value={code ?? '-'} />
+        <Summary label="Estado" value={status ?? 'Pendiente de revisión'} />
       </Card>
-      <Button label="Ver mis bienes" onPress={() => router.replace('/profile/assets')} />
-      <Button label="Volver al inicio" variant="secondary" onPress={() => router.replace('/(tabs)')} />
+      <Button label="Agregar otro bien" onPress={() => router.replace('/sell')} />
+      <Button label="Ver mis bienes" variant="secondary" onPress={() => router.replace('/profile/assets')} />
+      <Button label="Volver al inicio" variant="ghost" onPress={() => router.replace('/(tabs)')} />
     </Screen>
   );
 }
@@ -224,10 +239,12 @@ const styles = StyleSheet.create({
   stepNumber: { color: colors.textMuted, fontFamily: fonts.bold },
   stepNumberActive: { color: '#FFF' },
   stepLabel: { color: colors.textMuted, fontSize: typography.caption, fontFamily: fonts.regular },
-  categories: { flexDirection: 'row', gap: spacing.sm },
-  category: { flex: 1, alignItems: 'center', borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, paddingVertical: spacing.md, gap: spacing.sm },
+  categories: { gap: spacing.sm },
+  category: { flexDirection: 'row', alignItems: 'center', borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, padding: spacing.md, gap: spacing.md },
   categoryActive: { backgroundColor: colors.primarySoft, borderColor: colors.primary },
-  categoryText: { color: colors.text, fontSize: typography.small, fontFamily: fonts.medium, textAlign: 'center' },
+  categoryCopy: { flex: 1, gap: spacing.xs },
+  categoryText: { color: colors.text, fontSize: typography.body, fontFamily: fonts.bold },
+  categoryDescription: { color: colors.textMuted, fontSize: typography.small, fontFamily: fonts.regular },
   gallery: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
   previewWrap: { position: 'relative' },
   preview: { height: 94, width: 94, borderRadius: radius.md },

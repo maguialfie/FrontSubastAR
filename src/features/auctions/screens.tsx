@@ -83,7 +83,7 @@ export function AuctionsScreen() {
       <Header title="Subastas" />
       <SearchInput value={search} onChangeText={setSearch} placeholder="Buscar subasta" />
       <View style={styles.chips}>
-        {['Todas', 'En vivo', 'Proxima', 'Finalizada'].map((item) => (
+        {['Todas', 'En vivo', 'Próximas', 'Finalizada'].map((item) => (
           <Chip label={item} active={item === status} onPress={() => setStatus(item)} key={item} />
         ))}
       </View>
@@ -386,15 +386,15 @@ export function AuctionFiltersScreen() {
     <Screen>
       <Header title="Filtros" onBack={() => router.back()} />
       <Title>Filtrar subastas</Title>
-      <Body muted>Selecciona estado y moneda para encontrar colecciones disponibles.</Body>
+      <Body muted>Seleccioná estado, categoría y moneda para encontrar subastas disponibles.</Body>
       <Text style={styles.sectionHeading}>Estado</Text>
-      <View style={styles.chips}>{['Todas', 'En vivo', 'Proxima', 'Finalizada'].map((item) => <Chip key={item} label={item} active={status === item} onPress={() => setStatus(item)} />)}</View>
-      <Text style={styles.sectionHeading}>Categoria</Text>
-      <View style={styles.chips}>{['Todas', 'Arte', 'Joyeria', 'Diseno', 'Coleccion'].map((item) => <Chip key={item} label={item} active={category === item} onPress={() => setCategory(item)} />)}</View>
+      <View style={styles.chips}>{['Todas', 'En vivo', 'Próximas'].map((item) => <Chip key={item} label={item} active={status === item} onPress={() => setStatus(item)} />)}</View>
+      <Text style={styles.sectionHeading}>Categoría</Text>
+      <View style={styles.chips}>{['Todas', 'Oro', 'Platino', 'Plata', 'Especial', 'Común'].map((item) => <Chip key={item} label={item} active={category === item} onPress={() => setCategory(item)} />)}</View>
       <Text style={styles.sectionHeading}>Moneda</Text>
-      <View style={styles.chips}>{['Todas', 'USD', 'ARS'].map((item) => <Chip key={item} label={item} active={currency === item} onPress={() => setCurrency(item)} />)}</View>
+      <View style={styles.chips}>{['USD', 'ARS'].map((item) => <Chip key={item} label={item} active={currency === item} onPress={() => setCurrency(item)} />)}</View>
       <Button label="Aplicar filtros" onPress={() => router.replace({ pathname: '/(tabs)/auctions', params: { status, category, currency } })} />
-      <Button label="Limpiar" variant="ghost" onPress={() => { setStatus('Todas'); setCategory('Todas'); setCurrency('Todas'); }} />
+      <Button label="Limpiar todo" variant="ghost" onPress={() => { setStatus('Todas'); setCategory('Todas'); setCurrency('Todas'); }} />
     </Screen>
   );
 }

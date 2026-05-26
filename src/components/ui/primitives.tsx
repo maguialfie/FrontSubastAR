@@ -116,7 +116,7 @@ export function Badge({ label, tone = 'purple' }: { label: string; tone?: 'purpl
 }
 
 export function LoadingState() {
-  return <View style={styles.state}><ActivityIndicator color={colors.primary} /><Body muted>Cargando informacion...</Body></View>;
+  return <View style={styles.state}><ActivityIndicator color={colors.primary} /><Body muted>Cargando información...</Body></View>;
 }
 
 export function EmptyState({ title, message }: { title: string; message: string }) {
@@ -127,8 +127,8 @@ export function ErrorState({ message, onRetry }: { message?: string; onRetry?: (
   return (
     <Card style={styles.state}>
       <Ionicons name="cloud-offline-outline" size={27} color={colors.danger} />
-      <Text style={styles.sectionTitle}>No pudimos cargar la informacion</Text>
-      <Body muted>{message ?? 'Revisa que el backend este encendido e intenta nuevamente.'}</Body>
+      <Text style={styles.sectionTitle}>No pudimos cargar la información</Text>
+      <Body muted>{message ?? 'Revisá que el backend esté encendido e intentá nuevamente.'}</Body>
       {onRetry ? <Button label="Reintentar" variant="secondary" onPress={onRetry} /> : null}
     </Card>
   );
@@ -140,9 +140,9 @@ export function AuthRequiredModal({ visible, onClose, onLogin, onRegister }: { v
       <View style={styles.overlay}>
         <Card style={styles.modalCard}>
           <Ionicons name="lock-closed-outline" size={30} color={colors.primary} />
-          <Title>Inicia sesion</Title>
+          <Title>Iniciá sesión</Title>
           <Body muted>Necesitas una cuenta para pujar, vender productos o gestionar compras.</Body>
-          <Button label="Iniciar sesion" onPress={onLogin} />
+          <Button label="Iniciar sesión" onPress={onLogin} />
           <Button label="Crear cuenta" variant="secondary" onPress={onRegister} />
           <Button label="Ahora no" variant="ghost" onPress={onClose} />
         </Card>

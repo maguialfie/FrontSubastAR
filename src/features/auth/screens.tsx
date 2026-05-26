@@ -15,23 +15,23 @@ import { authService } from '@/services/api';
 import type { FileUpload } from '@/types/domain';
 
 const loginSchema = z.object({
-  email: z.email('Ingresa un correo valido.'),
-  password: z.string().min(6, 'Minimo 6 caracteres.'),
+  email: z.email('Ingresá un correo válido.'),
+  password: z.string().min(6, 'Mínimo 6 caracteres.'),
 });
 
 const registerSchema = z.object({
   name: z.string().min(2, 'Ingresa tu nombre.'),
   surname: z.string().min(2, 'Ingresa tu apellido.'),
-  email: z.email('Correo invalido.'),
+  email: z.email('Correo inválido.'),
   address: z.string().min(5, 'Ingresa tu domicilio.'),
-  country: z.string().min(2, 'Ingresa tu pais.'),
+  country: z.string().min(2, 'Ingresá tu país.'),
 });
 
-const verifySchema = z.object({ code: z.string().min(4, 'Ingresa el codigo recibido.') });
+const verifySchema = z.object({ code: z.string().min(4, 'Ingresá el código recibido.') });
 const passwordSchema = z.object({
-  password: z.string().min(8, 'Minimo 8 caracteres.'),
-  confirmation: z.string().min(8, 'Confirma tu contrasena.'),
-}).refine((values) => values.password === values.confirmation, { path: ['confirmation'], message: 'Las contrasenas no coinciden.' });
+  password: z.string().min(8, 'Mínimo 8 caracteres.'),
+  confirmation: z.string().min(8, 'Confirmá tu contraseña.'),
+}).refine((values) => values.password === values.confirmation, { path: ['confirmation'], message: 'Las contraseñas no coinciden.' });
 
 export function SplashScreen() {
   const router = useRouter();
@@ -56,11 +56,11 @@ export function WelcomeScreen() {
     <Screen style={styles.welcome}>
       <View style={styles.welcomeHero}>
         <BrandLogo iconSize={88} />
-        <Title>Descubri objetos unicos</Title>
+        <Title>Descubrí objetos únicos</Title>
         <Body muted>Explora subastas seleccionadas y participa desde cualquier lugar.</Body>
       </View>
       <View style={styles.actions}>
-        <Button label="Iniciar sesion" onPress={() => router.push('/login')} />
+        <Button label="Iniciar sesión" onPress={() => router.push('/login')} />
         <Button label="Crear cuenta" variant="secondary" onPress={() => router.push('/register')} />
         <Button label="Continuar como invitado" variant="ghost" onPress={() => { enterAsGuest(); router.replace('/(tabs)'); }} />
       </View>
@@ -71,7 +71,7 @@ export function WelcomeScreen() {
 export function LoginScreen() {
   const router = useRouter();
   const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
-  const { signIn } = useSession();
+  const { enterAsGuest, signIn } = useSession();
   const [apiError, setApiError] = useState('');
   const { control, handleSubmit, formState: { errors, isSubmitting } } = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
@@ -88,18 +88,20 @@ export function LoginScreen() {
   });
   return (
     <Screen>
-      <Header title="Iniciar sesion" onBack={() => router.back()} />
-      <Title>Bienvenido nuevamente</Title>
-      <Body muted>Ingresa para ofertar y gestionar tus operaciones.</Body>
+      <Header title="Sign in" onBack={() => router.back()} />
+      <Title>Bienvenido, qué bueno verte otra vez</Title>
       <Controller control={control} name="email" render={({ field: { onChange, value } }) => (
-        <Input label="Correo electronico" keyboardType="email-address" autoCapitalize="none" value={value} onChangeText={onChange} error={errors.email?.message} />
+        <Input label="Correo electrónico" keyboardType="email-address" autoCapitalize="none" value={value} onChangeText={onChange} error={errors.email?.message} />
       )} />
       <Controller control={control} name="password" render={({ field: { onChange, value } }) => (
-        <Input label="Contrasena" secureTextEntry value={value} onChangeText={onChange} error={errors.password?.message} />
+        <Input label="Contraseña" secureTextEntry value={value} onChangeText={onChange} error={errors.password?.message} />
       )} />
+      <Button label="¿Olvidaste tu contraseña?" variant="ghost" onPress={() => setApiError('La recuperación de contraseña todavía no está disponible.')} />
       {apiError ? <Text style={styles.error}>{apiError}</Text> : null}
-      <Button label={isSubmitting ? 'Ingresando...' : 'Iniciar sesion'} disabled={isSubmitting} onPress={submit} />
-      <Button label="Crear una cuenta" variant="ghost" onPress={() => router.push({ pathname: '/register', params: { returnTo } })} />
+      <Button label={isSubmitting ? 'Ingresando...' : 'Login'} disabled={isSubmitting} onPress={submit} />
+      <Button label="¿No tienes una cuenta? Regístrate" variant="ghost" onPress={() => router.push({ pathname: '/register', params: { returnTo } })} />
+      <Body muted>O</Body>
+      <Button label="Continúa como un invitado" variant="ghost" onPress={() => { enterAsGuest(); router.replace('/(tabs)'); }} />
     </Screen>
   );
 }
@@ -140,20 +142,21 @@ export function RegisterScreen() {
   });
   return (
     <Screen>
-      <Header title="Crear cuenta" subtitle="Paso 1 de 4" onBack={() => router.back()} />
-      <Title>Datos personales</Title>
+      <Header title="Sign up" subtitle="Paso 1 de 4" onBack={() => router.back()} />
+      <Title>Nombre y Apellido</Title>
       <Controller control={control} name="name" render={({ field }) => <Input label="Nombre" value={field.value} onChangeText={field.onChange} error={errors.name?.message} />} />
       <Controller control={control} name="surname" render={({ field }) => <Input label="Apellido" value={field.value} onChangeText={field.onChange} error={errors.surname?.message} />} />
-      <Controller control={control} name="email" render={({ field }) => <Input label="Correo" value={field.value} onChangeText={field.onChange} keyboardType="email-address" error={errors.email?.message} />} />
-      <Controller control={control} name="address" render={({ field }) => <Input label="Domicilio" value={field.value} onChangeText={field.onChange} error={errors.address?.message} />} />
-      <Controller control={control} name="country" render={({ field }) => <Input label="Pais de origen" value={field.value} onChangeText={field.onChange} error={errors.country?.message} />} />
-      <Text style={styles.label}>Documento de identidad</Text>
+      <Controller control={control} name="email" render={({ field }) => <Input label="Mail" value={field.value} onChangeText={field.onChange} keyboardType="email-address" error={errors.email?.message} />} />
+      <Controller control={control} name="address" render={({ field }) => <Input label="Domicilio legal" value={field.value} onChangeText={field.onChange} error={errors.address?.message} />} />
+      <Controller control={control} name="country" render={({ field }) => <Input label="País de origen" value={field.value} onChangeText={field.onChange} error={errors.country?.message} />} />
+      <Text style={styles.label}>Foto del documento</Text>
       <View style={styles.uploadRow}>
-        <UploadAction label="DNI frente" done={!!front} onPress={() => pick('front')} />
-        <UploadAction label="DNI dorso" done={!!back} onPress={() => pick('back')} />
+        <UploadAction label="Frente" done={!!front} onPress={() => pick('front')} />
+        <UploadAction label="Dorso" done={!!back} onPress={() => pick('back')} />
       </View>
       {apiError ? <Text style={styles.error}>{apiError}</Text> : null}
-      <Button label={isSubmitting ? 'Enviando...' : 'Enviar solicitud'} disabled={isSubmitting} onPress={submit} />
+      <Button label={isSubmitting ? 'Enviando...' : 'Sign up'} disabled={isSubmitting} onPress={submit} />
+      <Button label="¿Ya tienes una cuenta? Log in" variant="ghost" onPress={() => router.push({ pathname: '/login', params: { returnTo } })} />
     </Screen>
   );
 }
@@ -175,10 +178,10 @@ export function RegistrationPendingScreen() {
       <Card style={styles.centerCard}>
         <Ionicons name="mail-unread-outline" size={44} color={colors.primary} />
         <Title>Solicitud enviada</Title>
-        <Body muted>Recibimos tus datos y las imagenes del DNI. Cuando tu cuenta sea aprobada, recibiras el codigo por correo.</Body>
+        <Body muted>Recibimos tus datos y las imágenes del DNI. Cuando tu cuenta sea aprobada, recibirás el código por correo.</Body>
         {registration?.email ? <Text style={styles.pendingEmail}>{registration.email}</Text> : null}
       </Card>
-      <Button label="Ya recibi mi codigo" onPress={() => router.push('/verify')} />
+      <Button label="Ya recibí mi código" onPress={() => router.push('/verify')} />
       <Button label="Volver al acceso" variant="ghost" onPress={() => router.replace('/welcome')} />
     </Screen>
   );
@@ -193,7 +196,7 @@ export function VerifyScreen() {
   });
   const submit = handleSubmit(async ({ code }) => {
     if (!registration?.email) {
-      setApiError('Volver a registro para indicar el correo.');
+      setApiError('Volvé a registro para indicar el correo.');
       return;
     }
     try {
@@ -201,20 +204,22 @@ export function VerifyScreen() {
       setRegistration({ ...registration, verificationToken: response.token_verificacion });
       router.push('/password');
     } catch (error) {
-      setApiError(error instanceof Error ? error.message : 'Codigo invalido.');
+      setApiError(error instanceof Error ? error.message : 'Código inválido.');
     }
   });
   return (
     <Screen>
-      <Header title="Verificacion" subtitle="Paso 2 de 4" onBack={() => router.back()} />
+      <Header title="Verifica el código" subtitle="Paso 2 de 4" onBack={() => router.back()} />
       <Card style={styles.centerCard}>
         <Ionicons name="mail-outline" size={35} color={colors.primary} />
-        <Title>Revisa tu correo</Title>
-        <Body muted>Enviamos un codigo de verificacion para continuar con el registro.</Body>
+        <Body muted>Por favor, ingresá el código que te enviamos a tu email.</Body>
+        {registration?.email ? <Text style={styles.pendingEmail}>{registration.email}</Text> : null}
       </Card>
-      <Controller control={control} name="code" render={({ field }) => <Input label="Codigo de verificacion" placeholder="0000" keyboardType="number-pad" value={field.value} onChangeText={field.onChange} error={errors.code?.message} />} />
+      <Controller control={control} name="code" render={({ field }) => <Input label="Código de verificación" placeholder="0000" keyboardType="number-pad" value={field.value} onChangeText={field.onChange} error={errors.code?.message} />} />
       {apiError ? <Text style={styles.error}>{apiError}</Text> : null}
-      <Button label={isSubmitting ? 'Verificando...' : 'Verificar codigo'} disabled={isSubmitting} onPress={submit} />
+      <Body muted>¿No recibiste el código?</Body>
+      <Button label="Reenviar" variant="ghost" onPress={() => setApiError('La opción de reenvío todavía no está disponible.')} />
+      <Button label={isSubmitting ? 'Verificando...' : 'Verificar'} disabled={isSubmitting} onPress={submit} />
     </Screen>
   );
 }
@@ -228,7 +233,7 @@ export function PasswordScreen() {
   });
   const submit = handleSubmit(async (values) => {
     if (!registration?.verificationToken) {
-      setApiError('Primero verifica el codigo de correo.');
+      setApiError('Primero verificá el código de correo.');
       return;
     }
     try {
@@ -243,11 +248,11 @@ export function PasswordScreen() {
   return (
     <Screen>
       <Header title="Seguridad" subtitle="Paso 3 de 4" onBack={() => router.back()} />
-      <Title>Crea tu contrasena</Title>
-      <Controller control={control} name="password" render={({ field }) => <Input label="Contrasena" secureTextEntry value={field.value} onChangeText={field.onChange} error={errors.password?.message} />} />
-      <Controller control={control} name="confirmation" render={({ field }) => <Input label="Confirmar contrasena" secureTextEntry value={field.value} onChangeText={field.onChange} error={errors.confirmation?.message} />} />
+      <Title>Crea tu contraseña</Title>
+      <Controller control={control} name="password" render={({ field }) => <Input label="Contraseña" secureTextEntry value={field.value} onChangeText={field.onChange} error={errors.password?.message} />} />
+      <Controller control={control} name="confirmation" render={({ field }) => <Input label="Confirma tu contraseña" secureTextEntry value={field.value} onChangeText={field.onChange} error={errors.confirmation?.message} />} />
       {apiError ? <Text style={styles.error}>{apiError}</Text> : null}
-      <Button label={isSubmitting ? 'Creando cuenta...' : 'Continuar'} disabled={isSubmitting} onPress={submit} />
+      <Button label={isSubmitting ? 'Creando cuenta...' : 'Registrarse'} disabled={isSubmitting} onPress={submit} />
     </Screen>
   );
 }
@@ -257,12 +262,15 @@ export function OnboardingPaymentScreen() {
   const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
   return (
     <Screen>
-      <Header title="Medio de pago" subtitle="Paso 4 de 4" onBack={() => router.back()} />
-      <Title>Agrega un metodo de pago</Title>
-      <Body muted>Lo necesitaras para ofertar en una subasta en vivo. Tambien podes hacerlo mas tarde.</Body>
+      <Header title="Seleccioná un medio de pago" subtitle="Paso 4 de 4" onBack={() => router.back()} />
+      <Card style={styles.paymentNotice}>
+        <Title>No posees ningún medio de pago verificado.</Title>
+        <Body muted>Podés explorar la subasta, pero no podrás realizar pujas hasta que la empresa apruebe al menos un medio de pago.</Body>
+      </Card>
+      <Text style={styles.sectionLabel}>AGREGAR MEDIO DE PAGO</Text>
       {[
-        { label: 'Tarjeta de credito', type: 'tarjeta_credito' },
         { label: 'Cuenta bancaria', type: 'cuenta_bancaria' },
+        { label: 'Tarjeta de crédito', type: 'tarjeta_credito' },
         { label: 'Cheque certificado', type: 'cheque_certificado' },
       ].map((option, index) => (
         <Pressable key={option.type} onPress={() => router.push({ pathname: '/profile/payments/add', params: { type: option.type, onboarding: 'true', returnTo } })}>
@@ -292,5 +300,7 @@ const styles = StyleSheet.create({
   pending: { justifyContent: 'center' },
   pendingEmail: { color: colors.primary, fontSize: typography.body, fontFamily: fonts.medium },
   paymentOption: { flexDirection: 'row', alignItems: 'center' },
+  paymentNotice: { backgroundColor: colors.primarySoft },
+  sectionLabel: { color: colors.textMuted, fontSize: typography.small, fontFamily: fonts.bold },
   optionText: { flex: 1, fontSize: typography.body, color: colors.text, fontFamily: fonts.medium },
 });
