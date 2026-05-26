@@ -121,7 +121,12 @@ export function RegisterScreen() {
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.7 });
     if (!result.canceled) {
       const asset = result.assets[0];
-      const upload = { uri: asset.uri, name: asset.fileName ?? `dni-${side}.jpg`, type: asset.mimeType ?? 'image/jpeg', file: asset.file };
+      const upload: FileUpload = {
+        uri: asset.uri,
+        name: asset.fileName ?? `dni-${side}-${Date.now()}.jpg`,
+        type: asset.mimeType ?? 'image/jpeg',
+        file: asset.file,
+      };
       if (side === 'front') setFront(upload);
       else setBack(upload);
     }

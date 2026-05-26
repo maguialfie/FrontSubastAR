@@ -80,9 +80,10 @@ function absoluteAsset(uri?: string) {
 }
 
 function mapStatus(status: string): Auction['status'] {
-  if (status.toLowerCase() === 'en_vivo' || status.toLowerCase() === 'abierta') return 'En vivo';
-  if (status.toLowerCase() === 'finalizada' || status.toLowerCase() === 'cerrada') return 'Finalizada';
-  return 'Proxima';
+  const normalized = status.toLowerCase();
+  if (normalized === 'en_vivo' || normalized === 'abierta') return 'En vivo';
+  if (normalized === 'finalizada' || normalized === 'cerrada') return 'Finalizada';
+  return 'Próximas';
 }
 
 function mapAuction(auction: BackendAuction): Auction {
@@ -148,7 +149,7 @@ function mapAsset(asset: BackendAsset): OwnedAsset {
   return {
     id: String(asset.id), title: asset.nombre, category: asset.subasta_asignada ?? 'Sin asignar',
     status: asset.estado.toLowerCase() === 'aceptado' ? 'Aceptado' : asset.estado.toLowerCase() === 'rechazado' ? 'Rechazado' : 'Pendiente',
-    detail: asset.motivo_rechazo ?? asset.subasta_asignada ?? 'En evaluacion', basePrice: asset.precio_base,
+    detail: asset.motivo_rechazo ?? asset.subasta_asignada ?? 'En evaluación', basePrice: asset.precio_base,
     commission: asset.comision, depositLocation: asset.ubicacion_deposito, policyId: asset.poliza_id ? String(asset.poliza_id) : undefined,
     photosUploaded: asset.fotos_cargadas, documentationAttached: asset.documentacion_adjunta,
   };
@@ -156,10 +157,14 @@ function mapAsset(asset: BackendAsset): OwnedAsset {
 
 function appendFile(form: FormData, name: string, file: FileUpload) {
   if (file.file) {
-    form.append(name, file.file, file.name);
+    form.append(name, file.file, file.name || 'archivo');
     return;
   }
-  form.append(name, { uri: file.uri, name: file.name, type: file.type } as unknown as Blob);
+  form.append(name, {
+    uri: file.uri,
+    name: file.name || 'archivo',
+    type: file.type || 'application/octet-stream',
+  } as unknown as Blob);
 }
 
 export const authService = {
@@ -305,7 +310,7 @@ export const paymentService = {
       id: String(payment.id),
       type: payment.tipo === 'tarjeta_credito' ? 'Tarjeta' : payment.tipo === 'cuenta_bancaria' ? 'Cuenta bancaria' : 'Cheque certificado',
       label: payment.descripcion,
-      detail: payment.verificado ? 'Verificado' : 'Pendiente de verificacion',
+      detail: payment.verificado ? 'Verificado' : 'Pendiente de verificación',
       verified: payment.verificado,
       availableAmount: payment.monto_disponible,
     }));

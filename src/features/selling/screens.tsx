@@ -106,7 +106,7 @@ export function SellPhotosScreen() {
   async function addPhoto() {
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsMultipleSelection: true, quality: 0.7 });
     if (!result.canceled) setPhotos((current) => [...current, ...result.assets.map((asset, index) => ({
-      uri: asset.uri, name: asset.fileName ?? `bien-${index}.jpg`, type: asset.mimeType ?? 'image/jpeg', file: asset.file,
+      uri: asset.uri, name: asset.fileName ?? `bien-${Date.now()}-${index}.jpg`, type: asset.mimeType ?? 'image/jpeg', file: asset.file,
     }))].slice(0, 8));
   }
   return (
@@ -126,7 +126,7 @@ export function SellPhotosScreen() {
         ))}
         <Pressable style={styles.addPhoto} onPress={addPhoto}>
           <Ionicons name="camera-outline" size={28} color={colors.primary} />
-          <Text style={styles.addText}>Agregar</Text>
+          <Text style={styles.addText}>Agregá</Text>
         </Pressable>
       </View>
       <Badge label={`${photos.length} de 8 fotos cargadas`} tone={photos.length >= 6 ? 'green' : 'yellow'} />
@@ -147,7 +147,12 @@ export function SellDocumentsScreen() {
   });
   async function addDocument() {
     const result = await DocumentPicker.getDocumentAsync({ multiple: true, copyToCacheDirectory: true });
-    if (!result.canceled) setDocuments(result.assets.map((asset) => ({ uri: asset.uri, name: asset.name, type: asset.mimeType ?? 'application/pdf', file: asset.file })));
+    if (!result.canceled) setDocuments(result.assets.map((asset, index) => ({
+      uri: asset.uri,
+      name: asset.name || `documento-${Date.now()}-${index}.pdf`,
+      type: asset.mimeType ?? 'application/pdf',
+      file: asset.file,
+    })));
   }
   return (
     <Screen>

@@ -29,8 +29,8 @@ export function HomeScreen() {
         <Header title="Inicio bloqueado" />
         <Card style={styles.blockedHome}>
           <Ionicons name="lock-closed-outline" size={46} color={colors.danger} />
-          <Title>Tu cuenta esta bloqueada</Title>
-          <Body muted>{accountState.message ?? 'No podes operar mientras la cuenta permanezca bloqueada.'}</Body>
+          <Title>Tu cuenta está bloqueada</Title>
+          <Body muted>{accountState.message ?? 'No podés operar mientras la cuenta permanezca bloqueada.'}</Body>
           <Button label="Ver estado de cuenta" onPress={() => router.push('/profile/account-status')} />
         </Card>
       </Screen>
@@ -40,7 +40,7 @@ export function HomeScreen() {
     <Screen>
       <Header title="" right={<Ionicons name="notifications-outline" size={22} color={colors.text} />} />
       <Body muted>Bienvenido{session ? `, ${session.profile.name.split(' ')[0]}` : ''}</Body>
-      {isLoading ? <LoadingState /> : isError ? <ErrorState onRetry={() => refetch()} /> : featured ? <AuctionCard auction={featured} onPress={() => router.push(`/auction/${featured.id}`)} /> : <EmptyState title="No hay subastas destacadas" message="Volve a consultar mas tarde." />}
+      {isLoading ? <LoadingState /> : isError ? <ErrorState onRetry={() => refetch()} /> : featured ? <AuctionCard auction={featured} onPress={() => router.push(`/auction/${featured.id}`)} /> : <EmptyState title="No hay subastas destacadas" message="Volvé a consultar más tarde." />}
       <Pressable style={styles.exploreHero} onPress={() => router.push('/(tabs)/auctions')}>
         <Ionicons name="hammer-outline" size={27} color="#FFF" />
         <View style={styles.flex}>
@@ -184,7 +184,7 @@ export function LotDetailScreen() {
       <Body muted>{lot.description}</Body>
       {lot.artist ? <Card>
         <InfoRow icon="color-palette-outline" label="Artista" value={lot.artist} />
-        {lot.creationDate ? <InfoRow icon="calendar-outline" label="Fecha de creacion" value={lot.creationDate} /> : null}
+        {lot.creationDate ? <InfoRow icon="calendar-outline" label="Fecha de creación" value={lot.creationDate} /> : null}
         {lot.owner ? <InfoRow icon="document-text-outline" label="Procedencia" value={lot.owner} /> : null}
         {lot.history ? <Body muted>{lot.history}</Body> : null}
       </Card> : null}
@@ -225,7 +225,7 @@ export function LiveAuctionScreen() {
   if (!data.lot) return (
     <Screen>
       <Header title="Subasta en vivo" onBack={() => router.back()} />
-      <EmptyState title="No hay lote activo" message="El lote finalizo o aun no comenzo." />
+      <EmptyState title="No hay lote activo" message="El lote finalizó o aún no comenzó." />
       {lastLotId ? <Button label="Consultar resultado del lote" onPress={() => router.push({ pathname: '/result/[id]', params: { id, itemId: lastLotId } })} /> : null}
     </Screen>
   );
@@ -286,11 +286,11 @@ export function BidHistoryScreen() {
           isError ? <ErrorState onRetry={() => refetch()} /> :
             data?.length ? data.map((bid, index) => (
               <Card key={bid.id} style={styles.historyCard}>
-                <Badge label={index === 0 ? 'Oferta lider' : `Oferta ${index + 1}`} tone={index === 0 ? 'green' : 'purple'} />
+                <Badge label={index === 0 ? 'Oferta líder' : `Oferta ${index + 1}`} tone={index === 0 ? 'green' : 'purple'} />
                 <Text style={styles.offer}>{formatCurrency(bid.amount)}</Text>
                 <Body muted>{bid.bidder} - {bid.timestamp}</Body>
               </Card>
-            )) : <EmptyState title="Sin pujas registradas" message="Todavia no se realizaron ofertas para este lote." />}
+            )) : <EmptyState title="Sin pujas registradas" message="Todavía no se realizaron ofertas para este lote." />}
     </Screen>
   );
 }
@@ -310,7 +310,7 @@ export function ConfirmBidScreen() {
     },
   });
   if (isLoading) return <Screen><LoadingState /></Screen>;
-  if (!amount || !paymentId || !payment) return <Screen><Header title="Confirmar puja" onBack={() => router.back()} /><EmptyState title="Puja incompleta" message="Selecciona monto y medio de pago desde la subasta en vivo." /></Screen>;
+  if (!amount || !paymentId || !payment) return <Screen><Header title="Confirmar puja" onBack={() => router.back()} /><EmptyState title="Puja incompleta" message="Seleccioná monto y medio de pago desde la subasta en vivo." /></Screen>;
   const bidError = mutation.error instanceof ApiError ? mutation.error : undefined;
   const restricted = bidError?.status === 403;
   const restrictionMessage = bidError?.message.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') ?? '';
@@ -347,10 +347,10 @@ export function ResultScreen() {
   const router = useRouter();
   const { id, itemId } = useLocalSearchParams<{ id: string; itemId?: string }>();
   const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['result', id, itemId], queryFn: () => auctionService.result(id, itemId ?? ''), enabled: !!itemId });
-  if (!itemId) return <Screen><Header title="Resultado" onBack={() => router.back()} /><EmptyState title="Resultado no disponible" message="Abri el resultado desde una subasta finalizada." /></Screen>;
+  if (!itemId) return <Screen><Header title="Resultado" onBack={() => router.back()} /><EmptyState title="Resultado no disponible" message="Abrí el resultado desde una subasta finalizada." /></Screen>;
   if (isLoading) return <Screen><LoadingState /></Screen>;
   if (isError || !data) return <Screen><Header title="Resultado" onBack={() => router.back()} /><ErrorState onRetry={() => refetch()} /></Screen>;
-  if (data.status === 'en_curso') return <Screen><Header title="Resultado" onBack={() => router.back()} /><EmptyState title="Subasta en curso" message="Todavia no se declaro un resultado para este lote." /></Screen>;
+  if (data.status === 'en_curso') return <Screen><Header title="Resultado" onBack={() => router.back()} /><EmptyState title="Subasta en curso" message="Todavía no se declaró un resultado para este lote." /></Screen>;
   return (
     <Screen style={styles.result}>
       <Ionicons name={data.won ? 'trophy-outline' : 'time-outline'} size={58} color={colors.primary} />

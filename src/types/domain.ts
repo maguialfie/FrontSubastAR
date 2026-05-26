@@ -1,4 +1,4 @@
-export type AuctionStatus = 'Proxima' | 'En vivo' | 'Finalizada';
+export type AuctionStatus = 'Próximas' | 'En vivo' | 'Finalizada';
 export type AccountStatus = 'Regular' | 'Multado' | 'Bloqueado';
 
 export interface Auction {

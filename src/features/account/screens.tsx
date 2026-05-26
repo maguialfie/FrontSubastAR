@@ -10,14 +10,14 @@ import { Badge, Body, Button, Card, ConfirmationModal, EmptyState, ErrorState, H
 import { colors, fonts, radius, spacing, typography } from '@/constants/theme';
 import { useSession } from '@/providers/app-provider';
 import { assetService, authService, chatService, insuranceService, paymentService, profileService, purchaseService } from '@/services/api';
-import type { PaymentMethodKind } from '@/types/domain';
+import type { FileUpload, PaymentMethodKind } from '@/types/domain';
 
 function GuestNotice() {
   const router = useRouter();
   return (
     <Card style={styles.notice}>
       <Ionicons name="lock-closed-outline" size={28} color={colors.primary} />
-      <Title>Area personal</Title>
+      <Title>Área personal</Title>
       <Body muted>Iniciá sesión para acceder a esta sección.</Body>
       <Button label="Iniciar sesión" onPress={() => router.push('/login')} />
     </Card>
@@ -197,7 +197,7 @@ export function PaymentsScreen() {
           <PaymentMethodCard payment={payment} selected={payment.verified} />
           <Button label="Eliminar" variant="ghost" onPress={() => setSelectedForRemoval(payment.id)} />
         </View>
-      )) : <EmptyState title="Sin medios de pago" message="Agrega uno para participar de una puja." />}
+      )) : <EmptyState title="Sin medios de pago" message="Agregá uno para participar de una puja." />}
       <Title>Agregar medio</Title>
       <Button label="Tarjeta de crédito" variant="secondary" onPress={() => router.push({ pathname: '/profile/payments/add', params: { type: 'tarjeta_credito' } })} />
       <Button label="Cuenta bancaria" variant="secondary" onPress={() => router.push({ pathname: '/profile/payments/add', params: { type: 'cuenta_bancaria' } })} />
@@ -205,7 +205,7 @@ export function PaymentsScreen() {
       <ConfirmationModal
         visible={!!selectedForRemoval}
         title="Eliminar medio de pago"
-        message="Este medio dejara de estar disponible para futuras pujas y pagos pendientes."
+        message="Este medio dejará de estar disponible para futuras pujas y pagos pendientes."
         confirmLabel="Eliminar"
         pending={remove.isPending}
         onClose={() => setSelectedForRemoval(undefined)}
@@ -238,7 +238,7 @@ export function AssetsScreen() {
           <Body muted>{asset.category} - {asset.detail}</Body>
           <Button label="Ver detalle" variant="secondary" onPress={() => router.push({ pathname: '/profile/assets/[id]', params: { id: asset.id } })} />
         </Card>
-      )) : <EmptyState title="Sin bienes en este estado" message="Tus solicitudes apareceran aca al ser registradas." />}
+      )) : <EmptyState title="Sin bienes en este estado" message="Tus solicitudes aparecerán acá al ser registradas." />}
       <Button label="Subir un producto" onPress={() => router.push('/sell')} />
     </Screen>
   );
@@ -354,14 +354,14 @@ export function PurchasePaymentScreen() {
       <Card>
         <Title>{purchase.lot.title}</Title>
         <SummaryLine label="Monto a regularizar" value={formatCurrency(purchase.total ?? purchase.amount + purchase.fee)} bold />
-        <Body muted>Selecciona un medio verificado para confirmar el pago pendiente.</Body>
+        <Body muted>Seleccioná un medio verificado para confirmar el pago pendiente.</Body>
       </Card>
       {usablePayments.length ? usablePayments.map((payment) => (
         <Pressable key={payment.id} onPress={() => setPaymentId(payment.id)}>
           <PaymentMethodCard payment={payment} selected={paymentId === payment.id} />
         </Pressable>
       )) : (
-        <EmptyState title="Sin medios habilitados" message="Agrega o verifica un medio de pago antes de regularizar la compra." />
+        <EmptyState title="Sin medios habilitados" message="Agregá o verificá un medio de pago antes de regularizar la compra." />
       )}
       <Button label={pay.isPending ? 'Confirmando pago...' : 'Confirmar pago'} disabled={!paymentId || pay.isPending} onPress={() => pay.mutate()} />
       {!usablePayments.length ? <Button label="Agregar medio de pago" variant="secondary" onPress={() => router.push('/profile/payments')} /> : null}
@@ -536,7 +536,7 @@ export function ChatsScreen() {
           <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
         </Card>
         </Pressable>
-      )) : <EmptyState title="Sin conversaciones" message="Tus consultas y notificaciones apareceran aca." />}
+      )) : <EmptyState title="Sin conversaciones" message="Tus consultas y notificaciones aparecerán acá." />}
     </Screen>
   );
 }
@@ -610,7 +610,7 @@ export function PaymentAddScreen() {
   const [expiry, setExpiry] = useState('');
   const [security, setSecurity] = useState('');
   const [dni, setDni] = useState('');
-  const [photo, setPhoto] = useState<{ uri: string; name: string; type: string; file?: Blob }>();
+  const [photo, setPhoto] = useState<FileUpload>();
   const save = useMutation({
     mutationFn: () => paymentService.create({
       type: kind, bankName: bank, bankCountry: country, cbuIban: kind === 'cuenta_bancaria' ? identifier : undefined,
@@ -627,7 +627,7 @@ export function PaymentAddScreen() {
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.7 });
     if (!result.canceled) {
       const asset = result.assets[0];
-      setPhoto({ uri: asset.uri, name: asset.fileName ?? 'cheque.jpg', type: asset.mimeType ?? 'image/jpeg', file: asset.file });
+      setPhoto({ uri: asset.uri, name: asset.fileName ?? `cheque-${Date.now()}.jpg`, type: asset.mimeType ?? 'image/jpeg', file: asset.file });
     }
   }
   const label = kind === 'tarjeta_credito' ? 'Tarjeta de crédito' : kind === 'cuenta_bancaria' ? 'Cuenta bancaria' : 'Cheque certificado';
@@ -711,8 +711,8 @@ export function AssetDetailScreen() {
         <Button label="Aceptar condiciones" onPress={() => accept.mutate(true)} />
         <Button label="Rechazar condiciones" variant="secondary" onPress={() => accept.mutate(false)} />
       </> : null}
-      {accept.isSuccess ? <Card style={styles.okStatus}><Badge label="Respuesta enviada" tone="green" /><Body muted>Registramos tu decision sobre las condiciones del bien.</Body></Card> : null}
-      {accept.isError ? <Body muted>{accept.error instanceof Error ? accept.error.message : 'No fue posible registrar la decision.'}</Body> : null}
+      {accept.isSuccess ? <Card style={styles.okStatus}><Badge label="Respuesta enviada" tone="green" /><Body muted>Registramos tu decisión sobre las condiciones del bien.</Body></Card> : null}
+      {accept.isError ? <Body muted>{accept.error instanceof Error ? accept.error.message : 'No fue posible registrar la decisión.'}</Body> : null}
     </Screen>
   );
 }

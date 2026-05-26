@@ -1,56 +1,54 @@
-# Welcome to your Expo app 👋
+# SubastAR Frontend
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Aplicacion movil de subastas construida con React Native, Expo SDK 55, Expo Router y TypeScript. El diseno visual se basa en el prototipo de alta fidelidad de Figma.
 
-## Get started
+## Requisitos
 
-1. Install dependencies
+- Node.js compatible con Expo SDK 55 (`20.19.x` o superior compatible).
+- Backend SubastAR disponible para validar los flujos reales.
+- Android Emulator, dispositivo Android con Expo Go o navegador web para revision.
 
-   ```bash
-   npm install
-   ```
+## Configuracion De API
 
-2. Start the app
+El frontend consume la URL definida en `EXPO_PUBLIC_API_URL`. Si no se configura, conserva el valor por defecto `http://localhost:8080/api/v1`, util para Expo Web ejecutado en la misma PC que el backend.
 
-   ```bash
-   npx expo start
-   ```
+1. Crear un archivo `.env` tomando como referencia `.env.example`.
+2. Elegir la URL segun el entorno:
 
-In the output, you'll find options to open the app in a
+| Entorno | URL de ejemplo |
+|---|---|
+| Web local | `http://localhost:8080/api/v1` |
+| Android Emulator | `http://10.0.2.2:8080/api/v1` |
+| Celular fisico en la misma red | `http://IP_LOCAL_NOTEBOOK:8080/api/v1` |
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+No se debe guardar una IP personal fija en el codigo fuente.
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Comandos
 
 ```bash
-npm run reset-project
+npm install
+npm run lint
+npm run web
+npm run android
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Para iniciar web con una URL especifica desde macOS o Linux:
 
-### Other setup steps
+```bash
+EXPO_PUBLIC_API_URL=http://localhost:8080/api/v1 npm run web
+```
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+En Windows PowerShell:
 
-## Learn more
+```powershell
+$env:EXPO_PUBLIC_API_URL="http://localhost:8080/api/v1"
+npm run web
+```
 
-To learn more about developing your project with Expo, look at the following resources:
+## Integracion Y QA
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+- El contrato que actualmente consume el frontend esta documentado en [`docs/api-contract-front-back.md`](docs/api-contract-front-back.md).
+- La cobertura de pantallas y sus dependencias de API se registra en [`docs/figma-screen-matrix.md`](docs/figma-screen-matrix.md).
+- La revision manual previa a una entrega se realiza con [`docs/manual-qa-checklist.md`](docs/manual-qa-checklist.md).
 
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Los flujos de historial de participaciones y listado de polizas permanecen parciales hasta contar con endpoints dedicados del backend.

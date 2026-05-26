@@ -59,6 +59,45 @@ export class ApiError extends Error {
   }
 }
 
+async function extractErrorMessage(response: Response): Promise<string> {
+  const fallback = 'Error de servidor.';
+  const contentType = response.headers.get('content-type') ?? '';
+
+  if (!contentType.includes('application/json')) {
+    const text = await response.text().catch(() => '');
+    return text.trim() || fallback;
+  }
+
+  const payload = await response.json().catch(() => undefined) as
+    | Record<string, unknown>
+    | undefined;
+  if (!payload) return fallback;
+
+  for (const key of ['message', 'error', 'detail']) {
+    const value = payload[key];
+    if (typeof value === 'string' && value.trim()) return value;
+  }
+
+  for (const key of ['errors', 'errores']) {
+    const value = payload[key];
+    if (Array.isArray(value)) {
+      const messages = value.map((item) => {
+        if (typeof item === 'string') return item;
+        if (item && typeof item === 'object' && 'message' in item && typeof item.message === 'string') return item.message;
+        return JSON.stringify(item);
+      }).filter(Boolean);
+      if (messages.length) return messages.join('\n');
+    }
+  }
+
+  const fieldMessages = Object.entries(payload)
+    .filter(([, value]) => typeof value === 'string')
+    .map(([field, value]) => `${field}: ${value}`);
+  if (fieldMessages.length) return fieldMessages.join('\n');
+
+  return fallback;
+}
+
 async function getToken() {
   const stored = Platform.OS === 'web'
     ? globalThis.localStorage?.getItem(SESSION_KEY)
@@ -74,9 +113,9 @@ export async function request<T>(route: string, options?: RequestInit): Promise<
   if (options?.body && !(options.body instanceof FormData)) headers.set('Content-Type', 'application/json');
   const response = await fetch(`${apiConfig.baseUrl}${route}`, { ...options, headers });
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: 'Error de servidor.' })) as { message?: string };
+    const message = await extractErrorMessage(response);
     if (response.status === 401 && token && unauthorizedHandler) await unauthorizedHandler();
-    throw new ApiError(error.message ?? 'Error de servidor.', response.status);
+    throw new ApiError(message, response.status);
   }
   if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
@@ -88,9 +127,9 @@ export async function requestText(route: string, options?: RequestInit): Promise
   if (token) headers.set('Authorization', `Bearer ${token}`);
   const response = await fetch(`${apiConfig.baseUrl}${route}`, { ...options, headers });
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: 'Error de servidor.' })) as { message?: string };
+    const message = await extractErrorMessage(response);
     if (response.status === 401 && token && unauthorizedHandler) await unauthorizedHandler();
-    throw new ApiError(error.message ?? 'Error de servidor.', response.status);
+    throw new ApiError(message, response.status);
   }
   return response.text();
 }
