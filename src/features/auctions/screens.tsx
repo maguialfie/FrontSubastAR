@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { AuctionCard, formatCurrency, LotCard, PaymentMethodCard } from '@/components/domain/cards';
-import { AuthRequiredModal, Badge, Body, Button, Card, Chip, EmptyState, ErrorState, Header, Input, LoadingState, Screen, SearchInput, Title } from '@/components/ui/primitives';
+import { AuthRequiredModal, Badge, Body, Button, Card, Chip, EmptyState, ErrorState, Header, InfoTile, Input, LoadingState, Screen, SearchInput, SectionLabel, StatusPanel, Title } from '@/components/ui/primitives';
 import { colors, fonts, radius, spacing, typography } from '@/constants/theme';
 import { useSession } from '@/providers/app-provider';
 import { auctionService, paymentService, profileService } from '@/services/api';
@@ -41,6 +41,10 @@ export function HomeScreen() {
       <Header title="" right={<Ionicons name="notifications-outline" size={22} color={colors.text} />} />
       <Body muted>Bienvenido{session ? `, ${session.profile.name.split(' ')[0]}` : ''}</Body>
       <Title>Subastas seleccionadas</Title>
+      <View style={styles.tileRow}>
+        <InfoTile icon="radio-outline" label="En vivo" value="Ofertá en tiempo real" />
+        <InfoTile icon="cube-outline" label="Catálogo" value="Lotes verificados" />
+      </View>
       {isLoading ? <LoadingState /> : isError ? <ErrorState onRetry={() => refetch()} /> : featured ? <AuctionCard auction={featured} onPress={() => router.push(`/auction/${featured.id}`)} /> : <EmptyState title="No hay subastas destacadas" message="Volvé a consultar más tarde." />}
       <Pressable style={styles.exploreHero} onPress={() => router.push('/(tabs)/auctions')}>
         <Ionicons name="hammer-outline" size={27} color="#FFF" />
@@ -83,6 +87,7 @@ export function AuctionsScreen() {
     <Screen>
       <Header title="Subastas" />
       <SearchInput value={search} onChangeText={setSearch} placeholder="Buscar subasta" />
+      <SectionLabel>Estado de subasta</SectionLabel>
       <View style={styles.chips}>
         {['Todas', 'En vivo', 'Próximas', 'Finalizada'].map((item) => (
           <Chip label={item} active={item === status} onPress={() => setStatus(item)} key={item} />
@@ -110,9 +115,11 @@ export function AuctionDetailScreen() {
           <Title>{auction.name}</Title>
           <Badge label={auction.status} tone="green" />
         </View>
-        <InfoRow icon="calendar-outline" label="Fecha y hora" value={auction.date} />
+        <View style={styles.tileRow}>
+          <InfoTile icon="calendar-outline" label="Fecha y hora" value={auction.date} />
+          <InfoTile icon="cash-outline" label="Moneda" value={auction.currency} />
+        </View>
         <InfoRow icon="location-outline" label="Lugar" value={auction.location} />
-        <InfoRow icon="cash-outline" label="Moneda" value={auction.currency} />
         <InfoRow icon="person-outline" label="Rematador" value={auction.auctioneer} />
       </Card>
       <Card>
@@ -154,6 +161,7 @@ export function CatalogScreen() {
   return (
     <Screen>
       <Header title="Catálogo" subtitle={auction?.name} onBack={() => router.back()} />
+      <SectionLabel>Estado de lotes</SectionLabel>
       <View style={styles.chips}>
         {['Todas', 'Disponibles', 'Vendidos'].map((item) => <Chip key={item} label={item} active={filter === item} onPress={() => setFilter(item)} />)}
       </View>
@@ -237,20 +245,23 @@ export function LiveAuctionScreen() {
       {data.lot.image ? <Image source={{ uri: data.lot.image }} style={styles.liveImage} /> : <View style={[styles.liveImage, styles.imagePlaceholder]}><Ionicons name="image-outline" size={38} color={colors.primary} /></View>}
       <Title>{data.lot.title}</Title>
       <Card style={styles.bidPanel}>
+        <SectionLabel>Consola de puja</SectionLabel>
         <Body muted>Mejor oferta actual</Body>
         <Text style={styles.offer}>{formatCurrency(data.bestBid)}</Text>
-        <Body muted>Puja mínima: {formatCurrency(data.minBid)}</Body>
-        {data.maxBid != null ? <Body muted>Puja máxima: {formatCurrency(data.maxBid)}</Body> : null}
+        <View style={styles.tileRow}>
+          <InfoTile icon="trending-up-outline" label="Puja mínima" value={formatCurrency(data.minBid)} />
+          <InfoTile icon="shield-checkmark-outline" label="Puja máxima" value={data.maxBid != null ? formatCurrency(data.maxBid) : 'Sin tope'} />
+        </View>
         <Input label="Tu oferta" value={amount} keyboardType="number-pad" onChangeText={setAmount} />
         {usablePayments.length ? usablePayments.map((payment) => (
           <Pressable key={payment.id} onPress={() => setPaymentId(payment.id)}>
             <PaymentMethodCard payment={payment} selected={paymentId === payment.id} />
           </Pressable>
         )) : (
-          <Card style={styles.noPayment}>
-            <Body muted>No puedes pujar porque todavía no cuentas con medio de pago</Body>
+          <>
+            <StatusPanel icon="card-outline" title="Medio de pago pendiente" message="No podés pujar hasta contar con un medio aprobado para operar." tone="yellow" />
             <Button label="Agregar medio de pago" variant="secondary" onPress={() => router.push('/profile/payments')} />
-          </Card>
+          </>
         )}
         <Button
           label="Pujar"
@@ -258,7 +269,7 @@ export function LiveAuctionScreen() {
           onPress={() => router.push(`/live/${id}/confirm?amount=${encodeURIComponent(amount)}&paymentId=${encodeURIComponent(paymentId)}&itemId=${data.lot?.id}`)}
         />
       </Card>
-      <Text style={styles.sectionHeading}>Historial de pujas</Text>
+      <SectionLabel>Historial de pujas</SectionLabel>
       {data.history.map((bid) => (
         <View style={styles.bidRow} key={bid.id}>
           <Text style={styles.infoValue}>{bid.bidder}</Text>
@@ -329,7 +340,7 @@ export function ConfirmBidScreen() {
       {mutation.isError ? (
         <Card style={styles.restricted}>
           <Badge label={restricted ? 'Puja restringida' : 'Puja rechazada'} tone="red" />
-          <Title>{insufficientCategory ? 'No puedes pujar' : restricted ? 'No puedes ofertar en este lote' : 'No pudimos registrar la oferta'}</Title>
+          <Title>{insufficientCategory ? 'No podés pujar' : restricted ? 'No podés ofertar en este lote' : 'No pudimos registrar la oferta'}</Title>
           <Body muted>{insufficientCategory ? 'Todavía no cuentas con una categoría suficiente para participar en esta subasta.' : mutation.error instanceof Error ? mutation.error.message : 'La puja fue rechazada.'}</Body>
           {restricted && !insufficientCategory ? <Button label="Ver estado de cuenta" variant="secondary" onPress={() => router.push('/profile/account-status')} /> : null}
         </Card>
@@ -388,11 +399,11 @@ export function AuctionFiltersScreen() {
       <Header title="Filtros" onBack={() => router.back()} />
       <Title>Filtrar subastas</Title>
       <Body muted>Seleccioná estado, categoría y moneda para encontrar subastas disponibles.</Body>
-      <Text style={styles.sectionHeading}>Estado</Text>
+      <SectionLabel>Estado</SectionLabel>
       <View style={styles.chips}>{['Todas', 'En vivo', 'Próximas'].map((item) => <Chip key={item} label={item} active={status === item} onPress={() => setStatus(item)} />)}</View>
-      <Text style={styles.sectionHeading}>Categoría</Text>
+      <SectionLabel>Categoría</SectionLabel>
       <View style={styles.chips}>{['Todas', 'Oro', 'Platino', 'Plata', 'Especial', 'Común'].map((item) => <Chip key={item} label={item} active={category === item} onPress={() => setCategory(item)} />)}</View>
-      <Text style={styles.sectionHeading}>Moneda</Text>
+      <SectionLabel>Moneda</SectionLabel>
       <View style={styles.chips}>{['USD', 'ARS'].map((item) => <Chip key={item} label={item} active={currency === item} onPress={() => setCurrency(item)} />)}</View>
       <Button label="Aplicar filtros" onPress={() => router.replace({ pathname: '/(tabs)/auctions', params: { status, category, currency } })} />
       <Button label="Limpiar todo" variant="ghost" onPress={() => { setStatus('Todas'); setCategory('Todas'); setCurrency('Todas'); }} />
@@ -402,6 +413,7 @@ export function AuctionFiltersScreen() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
+  tileRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
   exploreHero: { minHeight: 96, borderRadius: radius.lg, padding: spacing.lg, backgroundColor: colors.primaryDark, flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   heroTitle: { fontSize: typography.heading, color: '#FFF', fontFamily: fonts.bold },
   heroBody: { fontSize: typography.small, color: '#D7D0FF', fontFamily: fonts.regular },
@@ -426,7 +438,6 @@ const styles = StyleSheet.create({
   timer: { color: colors.danger, fontFamily: fonts.black },
   liveImage: { height: 190, width: '100%', borderRadius: radius.lg },
   bidPanel: { backgroundColor: colors.surface, borderColor: colors.primaryBorder },
-  noPayment: { backgroundColor: colors.primarySoft },
   restricted: { backgroundColor: colors.dangerSoft, borderColor: colors.danger },
   bidAccepted: { backgroundColor: colors.successSoft, alignItems: 'center' },
   historyCard: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' },
