@@ -115,6 +115,77 @@ export function Badge({ label, tone = 'purple' }: { label: string; tone?: 'purpl
   );
 }
 
+export function SectionLabel({ children }: PropsWithChildren) {
+  return <Text style={styles.sectionLabelText}>{children}</Text>;
+}
+
+export function InfoTile({ icon, label, value, tone = 'purple' }: { icon: keyof typeof Ionicons.glyphMap; label: string; value: string; tone?: 'purple' | 'green' | 'red' | 'yellow' }) {
+  return (
+    <View style={[styles.infoTile, styles[`infoTile_${tone}`]]}>
+      <Ionicons name={icon} size={19} color={tone === 'green' ? colors.success : tone === 'red' ? colors.danger : tone === 'yellow' ? colors.warning : colors.primary} />
+      <View style={styles.infoTileCopy}>
+        <Text style={styles.infoTileLabel}>{label}</Text>
+        <Text style={styles.infoTileValue}>{value}</Text>
+      </View>
+    </View>
+  );
+}
+
+export function StepIndicator({ steps, current }: { steps: string[]; current: number }) {
+  return (
+    <View style={styles.stepWrap}>
+      {steps.map((step, index) => {
+        const active = index <= current;
+        return (
+          <View style={styles.stepItem} key={step}>
+            <View style={[styles.stepDot, active && styles.stepDotActive]}>
+              <Text style={[styles.stepNumber, active && styles.stepNumberActive]}>{index + 1}</Text>
+            </View>
+            <Text numberOfLines={1} style={[styles.stepLabel, active && styles.stepLabelActive]}>{step}</Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+export function UploadBox({ label, description, done, icon = 'cloud-upload-outline', onPress }: { label: string; description?: string; done?: boolean; icon?: keyof typeof Ionicons.glyphMap; onPress?: () => void }) {
+  return (
+    <Pressable onPress={onPress} style={[styles.uploadBox, done && styles.uploadBoxDone]}>
+      <Ionicons name={done ? 'checkmark-circle' : icon} size={24} color={done ? colors.success : colors.primary} />
+      <Text style={styles.uploadBoxTitle}>{label}</Text>
+      {description ? <Text style={styles.uploadBoxDescription}>{description}</Text> : null}
+    </Pressable>
+  );
+}
+
+export function StatusPanel({ icon, title, message, tone = 'purple' }: { icon: keyof typeof Ionicons.glyphMap; title: string; message: string; tone?: 'purple' | 'green' | 'red' | 'yellow' }) {
+  return (
+    <Card style={[styles.statusPanel, styles[`statusPanel_${tone}`]]}>
+      <View style={[styles.stateIcon, tone === 'red' && styles.errorIcon, tone === 'green' && styles.successIcon, tone === 'yellow' && styles.warningIcon]}>
+        <Ionicons name={icon} size={25} color={tone === 'green' ? colors.success : tone === 'red' ? colors.danger : tone === 'yellow' ? colors.warning : colors.primary} />
+      </View>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      <Body muted>{message}</Body>
+    </Card>
+  );
+}
+
+export function ActionRow({ icon, label, description, onPress }: { icon: keyof typeof Ionicons.glyphMap; label: string; description?: string; onPress?: () => void }) {
+  return (
+    <Pressable onPress={onPress}>
+      <Card style={styles.actionRow}>
+        <View style={styles.actionIcon}><Ionicons name={icon} size={22} color={colors.primary} /></View>
+        <View style={styles.actionCopy}>
+          <Text style={styles.actionLabel}>{label}</Text>
+          {description ? <Text style={styles.actionDescription}>{description}</Text> : null}
+        </View>
+        <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+      </Card>
+    </Pressable>
+  );
+}
+
 export function LoadingState() {
   return <View style={styles.state}><ActivityIndicator color={colors.primary} /><Body muted>Cargando información...</Body></View>;
 }
@@ -229,9 +300,42 @@ const styles = StyleSheet.create({
   badgeText_green: { color: colors.success },
   badgeText_red: { color: colors.danger },
   badgeText_yellow: { color: colors.warning },
+  sectionLabelText: { color: colors.textMuted, fontSize: typography.small, fontFamily: fonts.black, textTransform: 'uppercase', marginTop: spacing.xs },
+  infoTile: { flex: 1, minWidth: '47%', borderRadius: radius.md, padding: spacing.md, borderWidth: 1, flexDirection: 'row', gap: spacing.sm, alignItems: 'center' },
+  infoTile_purple: { backgroundColor: colors.primarySoft, borderColor: colors.primaryBorder },
+  infoTile_green: { backgroundColor: colors.successSoft, borderColor: '#C9EED5' },
+  infoTile_red: { backgroundColor: colors.dangerSoft, borderColor: '#F7C9C9' },
+  infoTile_yellow: { backgroundColor: colors.warningSoft, borderColor: '#F1DBA8' },
+  infoTileCopy: { flex: 1, gap: 2 },
+  infoTileLabel: { color: colors.textMuted, fontSize: typography.caption, fontFamily: fonts.medium },
+  infoTileValue: { color: colors.text, fontSize: typography.small, fontFamily: fonts.bold },
+  stepWrap: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.xs },
+  stepItem: { alignItems: 'center', gap: spacing.xs, flex: 1 },
+  stepDot: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+  stepDotActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  stepNumber: { color: colors.textMuted, fontFamily: fonts.bold, fontSize: typography.small },
+  stepNumberActive: { color: '#FFF' },
+  stepLabel: { color: colors.textMuted, fontSize: typography.caption, fontFamily: fonts.regular },
+  stepLabelActive: { color: colors.primary, fontFamily: fonts.bold },
+  uploadBox: { flex: 1, minHeight: 94, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.primaryBorder, borderRadius: radius.md, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', gap: spacing.xs, padding: spacing.md },
+  uploadBoxDone: { backgroundColor: colors.successSoft, borderColor: '#C9EED5', borderStyle: 'solid' },
+  uploadBoxTitle: { color: colors.text, fontFamily: fonts.bold, fontSize: typography.small, textAlign: 'center' },
+  uploadBoxDescription: { color: colors.textMuted, fontFamily: fonts.regular, fontSize: typography.caption, textAlign: 'center' },
+  statusPanel: { alignItems: 'center', textAlign: 'center' },
+  statusPanel_purple: { backgroundColor: colors.surface },
+  statusPanel_green: { backgroundColor: colors.successSoft, borderColor: '#C9EED5' },
+  statusPanel_red: { backgroundColor: colors.dangerSoft, borderColor: '#F7C9C9' },
+  statusPanel_yellow: { backgroundColor: colors.warningSoft, borderColor: '#F1DBA8' },
+  actionRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.md },
+  actionIcon: { width: 42, height: 42, borderRadius: 21, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
+  actionCopy: { flex: 1, gap: spacing.xs },
+  actionLabel: { color: colors.text, fontSize: typography.body, fontFamily: fonts.bold },
+  actionDescription: { color: colors.textMuted, fontSize: typography.small, fontFamily: fonts.regular },
   state: { alignItems: 'center', justifyContent: 'center', minHeight: 170, gap: spacing.sm },
   stateIcon: { width: 48, height: 48, borderRadius: radius.pill, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
   errorIcon: { backgroundColor: colors.dangerSoft },
+  successIcon: { backgroundColor: colors.successSoft },
+  warningIcon: { backgroundColor: colors.warningSoft },
   sectionTitle: { color: colors.text, fontSize: typography.heading, fontFamily: fonts.bold, textAlign: 'center' },
   overlay: { flex: 1, backgroundColor: 'rgba(17,17,23,0.45)', alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
   modalCard: { width: '100%', maxWidth: 360, alignItems: 'center' },

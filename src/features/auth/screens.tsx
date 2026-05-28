@@ -1,15 +1,14 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
 import { Controller, useForm } from 'react-hook-form';
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { z } from 'zod';
 
 import { BrandLogo } from '@/components/brand/logo';
-import { Body, Button, Card, Header, Input, Screen, Title } from '@/components/ui/primitives';
-import { colors, fonts, radius, spacing, typography } from '@/constants/theme';
+import { ActionRow, Body, Button, Header, InfoTile, Input, Screen, SectionLabel, StatusPanel, StepIndicator, Title, UploadBox } from '@/components/ui/primitives';
+import { colors, fonts, spacing, typography } from '@/constants/theme';
 import { useSession } from '@/providers/app-provider';
 import { authService } from '@/services/api';
 import type { FileUpload } from '@/types/domain';
@@ -32,6 +31,8 @@ const passwordSchema = z.object({
   password: z.string().min(8, 'Mínimo 8 caracteres.'),
   confirmation: z.string().min(8, 'Confirmá tu contraseña.'),
 }).refine((values) => values.password === values.confirmation, { path: ['confirmation'], message: 'Las contraseñas no coinciden.' });
+
+const registrationSteps = ['Datos', 'Código', 'Clave', 'Pago'];
 
 export function SplashScreen() {
   const router = useRouter();
@@ -56,8 +57,14 @@ export function WelcomeScreen() {
     <Screen style={styles.welcome}>
       <View style={styles.welcomeHero}>
         <BrandLogo iconSize={88} />
-        <Title>Descubrí objetos únicos</Title>
-        <Body muted>Explora subastas seleccionadas y participa desde cualquier lugar.</Body>
+        <View style={styles.centerCopy}>
+          <Title>Descubrí objetos únicos</Title>
+          <Body muted>Explorá subastas seleccionadas, pujás con respaldo operativo y gestionás tus compras desde un entorno seguro.</Body>
+        </View>
+        <View style={styles.tileRow}>
+          <InfoTile icon="shield-checkmark-outline" label="Cuenta" value="Validación segura" />
+          <InfoTile icon="hammer-outline" label="Subastas" value="Pujas en vivo" />
+        </View>
       </View>
       <View style={styles.actions}>
         <Button label="Iniciar sesión" onPress={() => router.push('/login')} />
@@ -90,6 +97,7 @@ export function LoginScreen() {
     <Screen>
       <Header title="Iniciar sesión" onBack={() => router.back()} />
       <Title>Bienvenido, qué bueno verte otra vez</Title>
+      <StatusPanel icon="lock-closed-outline" title="Acceso seguro" message="Ingresá para pujar, vender bienes, revisar compras y administrar tus medios de pago." />
       <Controller control={control} name="email" render={({ field: { onChange, value } }) => (
         <Input label="Correo electrónico" keyboardType="email-address" autoCapitalize="none" value={value} onChangeText={onChange} error={errors.email?.message} />
       )} />
@@ -148,13 +156,15 @@ export function RegisterScreen() {
   return (
     <Screen>
       <Header title="Crear cuenta" subtitle="Paso 1 de 4" onBack={() => router.back()} />
-      <Title>Nombre y Apellido</Title>
+      <StepIndicator steps={registrationSteps} current={0} />
+      <Title>Datos personales</Title>
+      <Body muted>Usamos estos datos para validar tu identidad antes de habilitar pujas y operaciones de venta.</Body>
       <Controller control={control} name="name" render={({ field }) => <Input label="Nombre" value={field.value} onChangeText={field.onChange} error={errors.name?.message} />} />
       <Controller control={control} name="surname" render={({ field }) => <Input label="Apellido" value={field.value} onChangeText={field.onChange} error={errors.surname?.message} />} />
       <Controller control={control} name="email" render={({ field }) => <Input label="Mail" value={field.value} onChangeText={field.onChange} keyboardType="email-address" error={errors.email?.message} />} />
       <Controller control={control} name="address" render={({ field }) => <Input label="Domicilio legal" value={field.value} onChangeText={field.onChange} error={errors.address?.message} />} />
       <Controller control={control} name="country" render={({ field }) => <Input label="País de origen" value={field.value} onChangeText={field.onChange} error={errors.country?.message} />} />
-      <Text style={styles.label}>Foto del documento</Text>
+      <SectionLabel>Documento de identidad</SectionLabel>
       <View style={styles.uploadRow}>
         <UploadAction label="Frente" done={!!front} onPress={() => pick('front')} />
         <UploadAction label="Dorso" done={!!back} onPress={() => pick('back')} />
@@ -167,12 +177,7 @@ export function RegisterScreen() {
 }
 
 function UploadAction({ label, done, onPress }: { label: string; done: boolean; onPress: () => void }) {
-  return (
-    <Pressable style={styles.upload} onPress={onPress}>
-      <Ionicons name={done ? 'checkmark-circle' : 'camera-outline'} size={22} color={done ? colors.success : colors.primary} />
-      <Text style={styles.uploadText}>{label}</Text>
-    </Pressable>
-  );
+  return <UploadBox label={label} description={done ? 'Imagen cargada' : 'Subir foto'} done={done} icon="camera-outline" onPress={onPress} />;
 }
 
 export function RegistrationPendingScreen() {
@@ -180,12 +185,8 @@ export function RegistrationPendingScreen() {
   const { registration } = useSession();
   return (
     <Screen style={styles.pending}>
-      <Card style={styles.centerCard}>
-        <Ionicons name="mail-unread-outline" size={44} color={colors.primary} />
-        <Title>Solicitud enviada</Title>
-        <Body muted>Recibimos tus datos y las imágenes del DNI. Cuando tu cuenta sea aprobada, recibirás el código por correo.</Body>
-        {registration?.email ? <Text style={styles.pendingEmail}>{registration.email}</Text> : null}
-      </Card>
+      <StatusPanel icon="mail-unread-outline" title="Solicitud enviada" message="Recibimos tus datos y las imágenes del DNI. Cuando tu cuenta sea aprobada, recibirás el código por correo." tone="green" />
+      {registration?.email ? <Text style={styles.pendingEmail}>{registration.email}</Text> : null}
       <Button label="Ya recibí mi código" onPress={() => router.push('/verify')} />
       <Button label="Volver al acceso" variant="ghost" onPress={() => router.replace('/welcome')} />
     </Screen>
@@ -215,11 +216,9 @@ export function VerifyScreen() {
   return (
     <Screen>
       <Header title="Verifica el código" subtitle="Paso 2 de 4" onBack={() => router.back()} />
-      <Card style={styles.centerCard}>
-        <Ionicons name="mail-outline" size={35} color={colors.primary} />
-        <Body muted>Por favor, ingresá el código que te enviamos a tu email.</Body>
-        {registration?.email ? <Text style={styles.pendingEmail}>{registration.email}</Text> : null}
-      </Card>
+      <StepIndicator steps={registrationSteps} current={1} />
+      <StatusPanel icon="mail-outline" title="Código de verificación" message="Ingresá el código enviado por correo para continuar con la creación de tu cuenta." />
+      {registration?.email ? <Text style={styles.pendingEmail}>{registration.email}</Text> : null}
       <Controller control={control} name="code" render={({ field }) => <Input label="Código de verificación" placeholder="0000" keyboardType="number-pad" value={field.value} onChangeText={field.onChange} error={errors.code?.message} />} />
       {apiError ? <Text style={styles.error}>{apiError}</Text> : null}
       <Body muted>¿No recibiste el código?</Body>
@@ -253,7 +252,9 @@ export function PasswordScreen() {
   return (
     <Screen>
       <Header title="Seguridad" subtitle="Paso 3 de 4" onBack={() => router.back()} />
+      <StepIndicator steps={registrationSteps} current={2} />
       <Title>Crea tu contraseña</Title>
+      <Body muted>Elegí una contraseña segura para proteger tus pujas, compras y documentación.</Body>
       <Controller control={control} name="password" render={({ field }) => <Input label="Contraseña" secureTextEntry value={field.value} onChangeText={field.onChange} error={errors.password?.message} />} />
       <Controller control={control} name="confirmation" render={({ field }) => <Input label="Confirma tu contraseña" secureTextEntry value={field.value} onChangeText={field.onChange} error={errors.confirmation?.message} />} />
       {apiError ? <Text style={styles.error}>{apiError}</Text> : null}
@@ -268,23 +269,15 @@ export function OnboardingPaymentScreen() {
   return (
     <Screen>
       <Header title="Seleccioná un medio de pago" subtitle="Paso 4 de 4" onBack={() => router.back()} />
-      <Card style={styles.paymentNotice}>
-        <Title>No posees ningún medio de pago verificado.</Title>
-        <Body muted>Podés explorar la subasta, pero no podrás realizar pujas hasta que la empresa apruebe al menos un medio de pago.</Body>
-      </Card>
-      <Text style={styles.sectionLabel}>AGREGAR MEDIO DE PAGO</Text>
+      <StepIndicator steps={registrationSteps} current={3} />
+      <StatusPanel icon="card-outline" title="Medio de pago requerido para pujar" message="Podés explorar subastas, pero para ofertar necesitás al menos un medio aprobado por la empresa." tone="yellow" />
+      <SectionLabel>Agregar medio de pago</SectionLabel>
       {[
-        { label: 'Cuenta bancaria', type: 'cuenta_bancaria' },
-        { label: 'Tarjeta de crédito', type: 'tarjeta_credito' },
-        { label: 'Cheque certificado', type: 'cheque_certificado' },
+        { label: 'Cuenta bancaria', type: 'cuenta_bancaria', description: 'Reservá fondos para operar en subastas.' },
+        { label: 'Tarjeta de crédito', type: 'tarjeta_credito', description: 'Usá una tarjeta a nombre del titular.' },
+        { label: 'Cheque certificado', type: 'cheque_certificado', description: 'Adjuntá el respaldo del cheque para revisión.' },
       ].map((option, index) => (
-        <Pressable key={option.type} onPress={() => router.push({ pathname: '/profile/payments/add', params: { type: option.type, onboarding: 'true', returnTo } })}>
-        <Card style={styles.paymentOption}>
-          <Ionicons name={index === 0 ? 'card-outline' : 'wallet-outline'} size={24} color={colors.primary} />
-          <Text style={styles.optionText}>{option.label}</Text>
-          <Ionicons name="chevron-forward" color={colors.textMuted} size={18} />
-        </Card>
-        </Pressable>
+        <ActionRow key={option.type} icon={index === 0 ? 'business-outline' : index === 1 ? 'card-outline' : 'wallet-outline'} label={option.label} description={option.description} onPress={() => router.push({ pathname: '/profile/payments/add', params: { type: option.type, onboarding: 'true', returnTo } })} />
       ))}
       <Button label="Omitir por ahora" variant="ghost" onPress={() => router.replace((returnTo || '/(tabs)') as Href)} />
     </Screen>
@@ -295,17 +288,11 @@ const styles = StyleSheet.create({
   splash: { alignItems: 'center', justifyContent: 'center', gap: spacing.md },
   welcome: { justifyContent: 'space-between' },
   welcomeHero: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.lg },
+  centerCopy: { alignItems: 'center', gap: spacing.sm },
+  tileRow: { flexDirection: 'row', gap: spacing.md, alignSelf: 'stretch' },
   actions: { gap: spacing.md },
   error: { color: colors.danger, fontSize: typography.small, fontFamily: fonts.regular },
-  label: { color: colors.textMuted, fontSize: typography.small, fontFamily: fonts.medium },
   uploadRow: { flexDirection: 'row', gap: spacing.md },
-  upload: { flex: 1, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.primaryBorder, borderRadius: radius.md, backgroundColor: colors.primarySoft, minHeight: 82, alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
-  uploadText: { color: colors.primary, fontFamily: fonts.medium, fontSize: typography.small },
-  centerCard: { alignItems: 'center' },
   pending: { justifyContent: 'center' },
   pendingEmail: { color: colors.primary, fontSize: typography.body, fontFamily: fonts.medium },
-  paymentOption: { flexDirection: 'row', alignItems: 'center' },
-  paymentNotice: { backgroundColor: colors.primarySoft },
-  sectionLabel: { color: colors.textMuted, fontSize: typography.small, fontFamily: fonts.bold },
-  optionText: { flex: 1, fontSize: typography.body, color: colors.text, fontFamily: fonts.medium },
 });
