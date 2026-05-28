@@ -88,7 +88,7 @@ export function LoginScreen() {
   });
   return (
     <Screen>
-      <Header title="Sign in" onBack={() => router.back()} />
+      <Header title="Iniciar sesión" onBack={() => router.back()} />
       <Title>Bienvenido, qué bueno verte otra vez</Title>
       <Controller control={control} name="email" render={({ field: { onChange, value } }) => (
         <Input label="Correo electrónico" keyboardType="email-address" autoCapitalize="none" value={value} onChangeText={onChange} error={errors.email?.message} />
@@ -98,7 +98,7 @@ export function LoginScreen() {
       )} />
       <Button label="¿Olvidaste tu contraseña?" variant="ghost" onPress={() => setApiError('La recuperación de contraseña todavía no está disponible.')} />
       {apiError ? <Text style={styles.error}>{apiError}</Text> : null}
-      <Button label={isSubmitting ? 'Ingresando...' : 'Login'} disabled={isSubmitting} onPress={submit} />
+      <Button label={isSubmitting ? 'Ingresando...' : 'Iniciar sesión'} disabled={isSubmitting} onPress={submit} />
       <Button label="¿No tienes una cuenta? Regístrate" variant="ghost" onPress={() => router.push({ pathname: '/register', params: { returnTo } })} />
       <Body muted>O</Body>
       <Button label="Continúa como un invitado" variant="ghost" onPress={() => { enterAsGuest(); router.replace('/(tabs)'); }} />
@@ -147,7 +147,7 @@ export function RegisterScreen() {
   });
   return (
     <Screen>
-      <Header title="Sign up" subtitle="Paso 1 de 4" onBack={() => router.back()} />
+      <Header title="Crear cuenta" subtitle="Paso 1 de 4" onBack={() => router.back()} />
       <Title>Nombre y Apellido</Title>
       <Controller control={control} name="name" render={({ field }) => <Input label="Nombre" value={field.value} onChangeText={field.onChange} error={errors.name?.message} />} />
       <Controller control={control} name="surname" render={({ field }) => <Input label="Apellido" value={field.value} onChangeText={field.onChange} error={errors.surname?.message} />} />
@@ -160,8 +160,8 @@ export function RegisterScreen() {
         <UploadAction label="Dorso" done={!!back} onPress={() => pick('back')} />
       </View>
       {apiError ? <Text style={styles.error}>{apiError}</Text> : null}
-      <Button label={isSubmitting ? 'Enviando...' : 'Sign up'} disabled={isSubmitting} onPress={submit} />
-      <Button label="¿Ya tienes una cuenta? Log in" variant="ghost" onPress={() => router.push({ pathname: '/login', params: { returnTo } })} />
+      <Button label={isSubmitting ? 'Enviando...' : 'Crear cuenta'} disabled={isSubmitting} onPress={submit} />
+      <Button label="¿Ya tienes una cuenta? Iniciá sesión" variant="ghost" onPress={() => router.push({ pathname: '/login', params: { returnTo } })} />
     </Screen>
   );
 }

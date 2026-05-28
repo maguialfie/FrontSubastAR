@@ -64,6 +64,16 @@ export const shadow = Platform.select({
   default: { elevation: 2 },
 });
 
+export const deepShadow = Platform.select({
+  ios: {
+    shadowColor: '#302477',
+    shadowOpacity: 0.12,
+    shadowOffset: { width: 0, height: 10 },
+    shadowRadius: 22,
+  },
+  default: { elevation: 4 },
+});
+
 // Compatibility exports for Expo template helpers that remain available during migration.
 export const Colors = {
   light: { text: colors.text, background: colors.background, backgroundElement: colors.surfaceAlt, backgroundSelected: colors.primarySoft, textSecondary: colors.textMuted },

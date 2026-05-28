@@ -40,6 +40,7 @@ export function HomeScreen() {
     <Screen>
       <Header title="" right={<Ionicons name="notifications-outline" size={22} color={colors.text} />} />
       <Body muted>Bienvenido{session ? `, ${session.profile.name.split(' ')[0]}` : ''}</Body>
+      <Title>Subastas seleccionadas</Title>
       {isLoading ? <LoadingState /> : isError ? <ErrorState onRetry={() => refetch()} /> : featured ? <AuctionCard auction={featured} onPress={() => router.push(`/auction/${featured.id}`)} /> : <EmptyState title="No hay subastas destacadas" message="Volvé a consultar más tarde." />}
       <Pressable style={styles.exploreHero} onPress={() => router.push('/(tabs)/auctions')}>
         <Ionicons name="hammer-outline" size={27} color="#FFF" />
@@ -401,14 +402,14 @@ export function AuctionFiltersScreen() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  exploreHero: { minHeight: 84, borderRadius: radius.lg, padding: spacing.lg, backgroundColor: colors.primaryDark, flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  exploreHero: { minHeight: 96, borderRadius: radius.lg, padding: spacing.lg, backgroundColor: colors.primaryDark, flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   heroTitle: { fontSize: typography.heading, color: '#FFF', fontFamily: fonts.bold },
   heroBody: { fontSize: typography.small, color: '#D7D0FF', fontFamily: fonts.regular },
-  sellHero: { minHeight: 82, borderRadius: radius.lg, padding: spacing.lg, backgroundColor: colors.primarySoft, flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  sellHero: { minHeight: 92, borderRadius: radius.lg, padding: spacing.lg, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.primaryBorder, flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   sellTitle: { fontSize: typography.heading, color: colors.text, fontFamily: fonts.bold },
   heroBodyDark: { fontSize: typography.small, color: colors.textMuted, fontFamily: fonts.regular },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  detailHero: { backgroundColor: colors.surfaceAlt },
+  detailHero: { backgroundColor: colors.surface, borderColor: colors.primaryBorder },
   between: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: spacing.md },
   infoRow: { flexDirection: 'row', gap: spacing.md, alignItems: 'center' },
   meta: { color: colors.textMuted, fontSize: typography.caption, fontFamily: fonts.regular },
@@ -419,12 +420,12 @@ const styles = StyleSheet.create({
   imagePlaceholder: { alignItems: 'center', justifyContent: 'center' },
   priceCard: { backgroundColor: colors.primarySoft },
   price: { fontSize: typography.body, color: colors.text, fontFamily: fonts.black },
-  liveBanner: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.dangerSoft, padding: spacing.md, borderRadius: radius.md },
+  liveBanner: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.dangerSoft, padding: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: '#F7C9C9' },
   liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.danger },
   liveText: { color: colors.danger, fontFamily: fonts.black, flex: 1 },
   timer: { color: colors.danger, fontFamily: fonts.black },
   liveImage: { height: 190, width: '100%', borderRadius: radius.lg },
-  bidPanel: { backgroundColor: colors.surfaceAlt },
+  bidPanel: { backgroundColor: colors.surface, borderColor: colors.primaryBorder },
   noPayment: { backgroundColor: colors.primarySoft },
   restricted: { backgroundColor: colors.dangerSoft, borderColor: colors.danger },
   bidAccepted: { backgroundColor: colors.successSoft, alignItems: 'center' },

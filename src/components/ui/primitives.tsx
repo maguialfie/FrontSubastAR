@@ -16,7 +16,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BrandWordmark } from '@/components/brand/logo';
-import { colors, fonts, radius, shadow, spacing, typography } from '@/constants/theme';
+import { colors, deepShadow, fonts, radius, shadow, spacing, typography, MaxContentWidth } from '@/constants/theme';
 
 export function Screen({ children, scroll = true, style }: PropsWithChildren<{ scroll?: boolean; style?: StyleProp<ViewStyle> }>) {
   const content = <View style={[styles.content, style]}>{children}</View>;
@@ -36,7 +36,7 @@ export function Header({ title, subtitle, onBack, right }: { title: string; subt
         </Pressable>
       ) : <BrandWordmark compact />}
       <View style={styles.headerCopy}>
-        <Text style={styles.headerTitle}>{title}</Text>
+        {title ? <Text style={styles.headerTitle}>{title}</Text> : null}
         {subtitle ? <Text style={styles.subtle}>{subtitle}</Text> : null}
       </View>
       {right ?? <View style={styles.headerSpacer} />}
@@ -120,13 +120,13 @@ export function LoadingState() {
 }
 
 export function EmptyState({ title, message }: { title: string; message: string }) {
-  return <Card style={styles.state}><Ionicons name="albums-outline" size={26} color={colors.primary} /><Text style={styles.sectionTitle}>{title}</Text><Body muted>{message}</Body></Card>;
+  return <Card style={styles.state}><View style={styles.stateIcon}><Ionicons name="albums-outline" size={24} color={colors.primary} /></View><Text style={styles.sectionTitle}>{title}</Text><Body muted>{message}</Body></Card>;
 }
 
 export function ErrorState({ message, onRetry }: { message?: string; onRetry?: () => void }) {
   return (
     <Card style={styles.state}>
-      <Ionicons name="cloud-offline-outline" size={27} color={colors.danger} />
+      <View style={[styles.stateIcon, styles.errorIcon]}><Ionicons name="cloud-offline-outline" size={25} color={colors.danger} /></View>
       <Text style={styles.sectionTitle}>No pudimos cargar la información</Text>
       <Body muted>{message ?? 'Revisá que el backend esté encendido e intentá nuevamente.'}</Body>
       {onRetry ? <Button label="Reintentar" variant="secondary" onPress={onRetry} /> : null}
@@ -184,20 +184,20 @@ export function ConfirmationModal({
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
-  scroll: { flexGrow: 1 },
-  content: { flex: 1, padding: spacing.xl, gap: spacing.lg, paddingBottom: 36 },
-  header: { flexDirection: 'row', alignItems: 'center', minHeight: 48, gap: spacing.md },
-  back: { height: 38, width: 38, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill, backgroundColor: colors.surfaceAlt },
+  safe: { flex: 1, backgroundColor: colors.surfaceAlt },
+  scroll: { flexGrow: 1, alignItems: 'center' },
+  content: { flex: 1, width: '100%', maxWidth: MaxContentWidth, padding: spacing.xl, gap: spacing.lg, paddingBottom: 92 },
+  header: { flexDirection: 'row', alignItems: 'center', minHeight: 52, gap: spacing.md },
+  back: { height: 40, width: 40, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, ...shadow },
   headerCopy: { flex: 1 },
   headerSpacer: { width: 34 },
-  headerTitle: { fontSize: typography.heading, fontFamily: fonts.bold, color: colors.text },
-  title: { color: colors.text, fontSize: typography.title, lineHeight: 30, fontFamily: fonts.black },
+  headerTitle: { fontSize: typography.heading, fontFamily: fonts.black, color: colors.text },
+  title: { color: colors.text, fontSize: typography.title, lineHeight: 31, fontFamily: fonts.black },
   body: { fontSize: typography.body, lineHeight: 20, color: colors.text, fontFamily: fonts.regular },
   subtle: { color: colors.textMuted },
   card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, padding: spacing.lg, gap: spacing.md, ...shadow },
-  button: { minHeight: 48, borderRadius: radius.md, flexDirection: 'row', gap: spacing.sm, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.lg },
-  button_primary: { backgroundColor: colors.primary },
+  button: { minHeight: 48, borderRadius: radius.sm, flexDirection: 'row', gap: spacing.sm, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.lg },
+  button_primary: { backgroundColor: colors.primary, ...deepShadow },
   button_secondary: { backgroundColor: colors.primarySoft, borderWidth: 1, borderColor: colors.primaryBorder },
   button_ghost: { backgroundColor: 'transparent' },
   button_danger: { backgroundColor: colors.danger },
@@ -209,27 +209,29 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.76 },
   disabled: { opacity: 0.45 },
   inputWrap: { gap: spacing.xs },
-  inputLabel: { fontSize: typography.small, color: colors.textMuted, fontFamily: fonts.medium },
-  input: { minHeight: 48, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: spacing.md, color: colors.text, backgroundColor: colors.background, fontFamily: fonts.regular },
+  inputLabel: { fontSize: typography.small, color: colors.textMuted, fontFamily: fonts.bold },
+  input: { minHeight: 48, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, paddingHorizontal: spacing.md, color: colors.text, backgroundColor: colors.surface, fontFamily: fonts.regular },
   inputError: { borderColor: colors.danger },
   errorText: { color: colors.danger, fontSize: typography.small, fontFamily: fonts.regular },
-  search: { backgroundColor: colors.surfaceAlt, borderRadius: radius.md, flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, minHeight: 46, gap: spacing.sm },
+  search: { backgroundColor: colors.surface, borderRadius: radius.pill, flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, minHeight: 48, gap: spacing.sm, borderWidth: 1, borderColor: colors.border },
   searchField: { flex: 1, color: colors.text, fontFamily: fonts.regular },
   chip: { borderRadius: radius.pill, backgroundColor: colors.surfaceAlt, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   chipActive: { backgroundColor: colors.primarySoft },
   chipText: { fontSize: typography.small, color: colors.textMuted, fontFamily: fonts.medium },
   chipTextActive: { color: colors.primary },
-  badge: { alignSelf: 'flex-start', borderRadius: radius.pill, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs },
-  badge_purple: { backgroundColor: colors.primarySoft },
-  badge_green: { backgroundColor: colors.successSoft },
-  badge_red: { backgroundColor: colors.dangerSoft },
-  badge_yellow: { backgroundColor: colors.warningSoft },
+  badge: { alignSelf: 'flex-start', borderRadius: radius.pill, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, borderWidth: 1, borderColor: 'transparent' },
+  badge_purple: { backgroundColor: colors.primarySoft, borderColor: colors.primaryBorder },
+  badge_green: { backgroundColor: colors.successSoft, borderColor: '#C9EED5' },
+  badge_red: { backgroundColor: colors.dangerSoft, borderColor: '#F7C9C9' },
+  badge_yellow: { backgroundColor: colors.warningSoft, borderColor: '#F1DBA8' },
   badgeText: { fontSize: typography.caption, fontFamily: fonts.bold },
   badgeText_purple: { color: colors.primary },
   badgeText_green: { color: colors.success },
   badgeText_red: { color: colors.danger },
   badgeText_yellow: { color: colors.warning },
-  state: { alignItems: 'center', justifyContent: 'center', minHeight: 150, gap: spacing.sm },
+  state: { alignItems: 'center', justifyContent: 'center', minHeight: 170, gap: spacing.sm },
+  stateIcon: { width: 48, height: 48, borderRadius: radius.pill, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
+  errorIcon: { backgroundColor: colors.dangerSoft },
   sectionTitle: { color: colors.text, fontSize: typography.heading, fontFamily: fonts.bold, textAlign: 'center' },
   overlay: { flex: 1, backgroundColor: 'rgba(17,17,23,0.45)', alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
   modalCard: { width: '100%', maxWidth: 360, alignItems: 'center' },
