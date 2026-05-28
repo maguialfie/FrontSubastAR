@@ -77,15 +77,22 @@ export function PaymentMethodCard({ payment, selected }: { payment: PaymentMetho
 }
 
 export function PurchaseCard({ purchase, onPress }: { purchase: Purchase; onPress: () => void }) {
+  const paymentTone = purchase.paymentStatus.toLowerCase() === 'pagado' ? 'green' : 'yellow';
   return (
     <Pressable onPress={onPress}>
-      <Card>
+      <Card style={styles.purchaseCard}>
         <View style={styles.rowBetween}>
-          <Text style={styles.cardTitle}>{purchase.lot.title}</Text>
-          <Badge label={purchase.paymentStatus} tone="green" />
+          <View style={styles.grow}>
+            <Text style={styles.cardTitle}>{purchase.lot.title}</Text>
+            <Text style={styles.meta}>{purchase.auctionName ?? 'Subasta'}</Text>
+          </View>
+          <Badge label={purchase.paymentStatus} tone={paymentTone} />
         </View>
         <Text style={styles.price}>{formatMoney(purchase.amount)}</Text>
-        <Body muted>{purchase.deliveryStatus}</Body>
+        <View style={styles.cardFooter}>
+          <Body muted>{purchase.deliveryStatus}</Body>
+          <Ionicons name="chevron-forward" size={16} color={colors.primary} />
+        </View>
       </Card>
     </Pressable>
   );
@@ -115,6 +122,7 @@ const styles = StyleSheet.create({
   lotTitle: { fontSize: typography.body, lineHeight: 19, color: colors.text, fontFamily: fonts.bold },
   price: { fontSize: typography.body, fontFamily: fonts.black, color: colors.primaryDark },
   payment: { flexDirection: 'row', alignItems: 'center' },
+  purchaseCard: { gap: spacing.md },
   selected: { backgroundColor: colors.primarySoft, borderColor: colors.primaryBorder },
   paymentIcon: { width: 42, height: 42, borderRadius: 21, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
   grow: { flex: 1, gap: spacing.xs },

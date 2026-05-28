@@ -6,7 +6,7 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { PaymentMethodCard, PurchaseCard, formatCurrency } from '@/components/domain/cards';
-import { Badge, Body, Button, Card, ConfirmationModal, EmptyState, ErrorState, Header, Input, LoadingState, Screen, Title } from '@/components/ui/primitives';
+import { ActionRow, Badge, Body, Button, Card, ConfirmationModal, EmptyState, ErrorState, Header, InfoTile, Input, LoadingState, Screen, SectionLabel, StatusPanel, Title, UploadBox } from '@/components/ui/primitives';
 import { colors, fonts, radius, spacing, typography } from '@/constants/theme';
 import { useSession } from '@/providers/app-provider';
 import { assetService, authService, chatService, insuranceService, paymentService, profileService, purchaseService } from '@/services/api';
@@ -40,6 +40,10 @@ export function ProfileScreen() {
         <Title>{profile.name}</Title>
         <Body muted>{profile.email}</Body>
         <Badge label={`Categoría ${profile.category}`} />
+        <View style={styles.tileRow}>
+          <InfoTile icon="person-outline" label="Estado" value={accountState?.status ?? profile.status} tone={accountState?.status === 'Regular' ? 'green' : accountState?.status === 'Bloqueado' ? 'red' : 'yellow'} />
+          <InfoTile icon="shield-checkmark-outline" label="Categoría" value={profile.category} />
+        </View>
       </Card>
       {accountState?.status === 'Multado' ? (
         <Card style={styles.problemStatus}>
@@ -49,16 +53,16 @@ export function ProfileScreen() {
           <Button label="Regularizar cuenta" onPress={() => router.push('/profile/account-status')} />
         </Card>
       ) : null}
-      <SectionLabel>CUENTA</SectionLabel>
+      <SectionLabel>Cuenta</SectionLabel>
       <MenuItem icon="person-outline" label="Datos personales" onPress={() => router.push('/profile/edit')} />
       <MenuItem icon="time-outline" label="Historial" onPress={() => router.push('/profile/history' as Href)} />
       <MenuItem icon="stats-chart-outline" label="Métricas" onPress={() => router.push('/profile/metrics')} />
       <MenuItem icon="cube-outline" label="Mis bienes" onPress={() => router.push('/profile/assets')} />
       <MenuItem icon="bag-check-outline" label="Mis compras" onPress={() => router.push('/purchases')} />
-      <SectionLabel>ESTADO OPERATIVO Y LEGAL</SectionLabel>
+      <SectionLabel>Estado operativo y legal</SectionLabel>
       <MenuItem icon="card-outline" label="Medios de pago" onPress={() => router.push('/profile/payments')} />
       <MenuItem icon="warning-outline" label="Multas" onPress={() => router.push('/profile/account-status')} />
-      <SectionLabel>GESTIÓN FINANCIERA</SectionLabel>
+      <SectionLabel>Gestión financiera</SectionLabel>
       <MenuItem icon="shield-checkmark-outline" label="Seguros y Pólizas" onPress={() => router.push('/profile/policies' as Href)} />
       <Button label="Cerrar sesión" variant="ghost" onPress={async () => {
         try { await authService.logout(); } finally { await signOut(); router.replace('/welcome'); }
@@ -68,19 +72,7 @@ export function ProfileScreen() {
 }
 
 function MenuItem({ icon, label, onPress }: { icon: keyof typeof Ionicons.glyphMap; label: string; onPress?: () => void }) {
-  return (
-    <Pressable onPress={onPress}>
-      <Card style={styles.menuItem}>
-        <Ionicons name={icon} size={21} color={colors.primary} />
-        <Text style={styles.menuText}>{label}</Text>
-        <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-      </Card>
-    </Pressable>
-  );
-}
-
-function SectionLabel({ children }: { children: string }) {
-  return <Text style={styles.sectionLabel}>{children}</Text>;
+  return <ActionRow icon={icon} label={label} onPress={onPress} />;
 }
 
 export function MetricsScreen() {
@@ -92,10 +84,10 @@ export function MetricsScreen() {
     <Screen>
       <Header title="Métricas" onBack={() => router.back()} />
       <View style={styles.metricGrid}>
-        <Metric value={String(data.participated)} label="Participadas" />
-        <Metric value={String(data.won)} label="Ganadas" />
-        <Metric value={`${Math.round(data.successRate * 100)}%`} label="Tasa de éxito" />
-        <Metric value={formatCurrency(data.totalPaid)} label="Total pagado" />
+        <InfoTile icon="hammer-outline" label="Participadas" value={String(data.participated)} />
+        <InfoTile icon="trophy-outline" label="Ganadas" value={String(data.won)} tone="green" />
+        <InfoTile icon="stats-chart-outline" label="Tasa de éxito" value={`${Math.round(data.successRate * 100)}%`} />
+        <InfoTile icon="cash-outline" label="Total pagado" value={formatCurrency(data.totalPaid)} />
       </View>
       <Card>
         <Title>Ganadas por mes</Title>
@@ -106,10 +98,6 @@ export function MetricsScreen() {
       </Card>
     </Screen>
   );
-}
-
-function Metric({ value, label }: { value: string; label: string }) {
-  return <Card style={styles.metric}><Text style={styles.metricValue}>{value}</Text><Body muted>{label}</Body></Card>;
 }
 
 export function ParticipationHistoryScreen() {
@@ -164,14 +152,8 @@ export function AccountStatusScreen() {
   return (
     <Screen>
       <Header title="Estado de cuenta" onBack={() => router.back()} />
-      <Card style={regular ? styles.okStatus : styles.problemStatus}>
-        <Ionicons name={regular ? 'checkmark-circle-outline' : blocked ? 'lock-closed-outline' : 'alert-circle-outline'} size={38} color={regular ? colors.success : colors.danger} />
-        <Title>{title}</Title>
-        <Body muted>{description}</Body>
-        {data.message ? <Body muted>{data.message}</Body> : null}
-        <Badge label={data.status} tone={regular ? 'green' : 'red'} />
-        {data.penalty > 0 ? <Text style={styles.penalty}>{formatCurrency(data.penalty)}</Text> : null}
-      </Card>
+      <StatusPanel icon={regular ? 'checkmark-circle-outline' : blocked ? 'lock-closed-outline' : 'alert-circle-outline'} title={title} message={data.message ? `${description} ${data.message}` : description} tone={regular ? 'green' : 'red'} />
+      {data.penalty > 0 ? <Text style={styles.penalty}>{formatCurrency(data.penalty)}</Text> : null}
       {!regular ? <Button label="Ver compras pendientes" onPress={() => router.push('/purchases')} /> : null}
     </Screen>
   );
@@ -198,10 +180,10 @@ export function PaymentsScreen() {
           <Button label="Eliminar" variant="ghost" onPress={() => setSelectedForRemoval(payment.id)} />
         </View>
       )) : <EmptyState title="Sin medios de pago" message="Agregá uno para participar de una puja." />}
-      <Title>Agregar medio</Title>
-      <Button label="Tarjeta de crédito" variant="secondary" onPress={() => router.push({ pathname: '/profile/payments/add', params: { type: 'tarjeta_credito' } })} />
-      <Button label="Cuenta bancaria" variant="secondary" onPress={() => router.push({ pathname: '/profile/payments/add', params: { type: 'cuenta_bancaria' } })} />
-      <Button label="Cheque certificado" variant="secondary" onPress={() => router.push({ pathname: '/profile/payments/add', params: { type: 'cheque_certificado' } })} />
+      <SectionLabel>Agregar medio</SectionLabel>
+      <ActionRow icon="card-outline" label="Tarjeta de crédito" description="Alta rápida para pagos y pujas." onPress={() => router.push({ pathname: '/profile/payments/add', params: { type: 'tarjeta_credito' } })} />
+      <ActionRow icon="business-outline" label="Cuenta bancaria" description="Reservá fondos para operar." onPress={() => router.push({ pathname: '/profile/payments/add', params: { type: 'cuenta_bancaria' } })} />
+      <ActionRow icon="wallet-outline" label="Cheque certificado" description="Requiere documentación para revisión." onPress={() => router.push({ pathname: '/profile/payments/add', params: { type: 'cheque_certificado' } })} />
       <ConfirmationModal
         visible={!!selectedForRemoval}
         title="Eliminar medio de pago"
@@ -222,6 +204,7 @@ export function AssetsScreen() {
   return (
     <Screen>
       <Header title="Mis bienes" onBack={() => router.back()} />
+      <SectionLabel>Estado de solicitud</SectionLabel>
       <View style={styles.filters}>
         {['Todos', 'Pendiente', 'Aceptado', 'Rechazado'].map((item) => (
           <Pressable key={item} style={[styles.filter, status === item && styles.filterActive]} onPress={() => setStatus(item)}>
@@ -257,7 +240,7 @@ export function PurchasesScreen() {
       <Header title="Mis compras" onBack={() => router.back()} />
       {isLoading ? <LoadingState /> : isError ? <ErrorState onRetry={() => refetch()} /> : data?.length ? sections.map((section) => section.items.length ? (
         <View key={section.label} style={styles.purchaseSection}>
-          <Text style={styles.sectionLabel}>{section.label}</Text>
+          <SectionLabel>{section.label}</SectionLabel>
           {section.items.map((purchase) => (
             <PurchaseCard key={purchase.id} purchase={purchase} onPress={() => router.push(`/purchases/${purchase.id}`)} />
           ))}
@@ -275,7 +258,7 @@ export function PoliciesScreen() {
   return (
     <Screen>
       <Header title="Seguros y Pólizas" onBack={() => router.back()} />
-      <Body muted>Tus pólizas asociadas a compras aparecerán acá.</Body>
+      <StatusPanel icon="shield-checkmark-outline" title="Cobertura de bienes" message="Tus pólizas asociadas a compras aparecerán acá cuando el backend informe el vínculo." />
       {isLoading ? <LoadingState /> : isError ? <ErrorState onRetry={() => refetch()} /> : insuredPurchases.length ? insuredPurchases.map((purchase) => (
         <Card key={purchase.insuranceId}>
           <Badge label="Póliza activa" tone="green" />
@@ -300,6 +283,10 @@ export function PurchaseDetailScreen() {
       <Card>
         <Title>{data.lot.title}</Title>
         <Body muted>{data.auctionName}</Body>
+        <View style={styles.tileRow}>
+          <InfoTile icon="card-outline" label="Pago" value={data.paymentStatus} tone={data.paymentStatus.toLowerCase() === 'pagado' ? 'green' : 'yellow'} />
+          <InfoTile icon="cube-outline" label="Entrega" value={data.deliveryStatus} />
+        </View>
         <SummaryLine label="Valor pujado" value={formatCurrency(data.amount)} />
         <SummaryLine label="Cargos y comisión" value={formatCurrency(data.fee)} />
         {data.shippingCost != null ? <SummaryLine label="Envío" value={formatCurrency(data.shippingCost)} /> : null}
@@ -356,6 +343,7 @@ export function PurchasePaymentScreen() {
         <SummaryLine label="Monto a regularizar" value={formatCurrency(purchase.total ?? purchase.amount + purchase.fee)} bold />
         <Body muted>Seleccioná un medio verificado para confirmar el pago pendiente.</Body>
       </Card>
+      <SectionLabel>Medios verificados</SectionLabel>
       {usablePayments.length ? usablePayments.map((payment) => (
         <Pressable key={payment.id} onPress={() => setPaymentId(payment.id)}>
           <PaymentMethodCard payment={payment} selected={paymentId === payment.id} />
@@ -447,6 +435,10 @@ export function PolicyScreen() {
         <Ionicons name="shield-checkmark-outline" size={36} color={colors.primary} />
         <Title>{data.company}</Title>
         <Body muted>Póliza {data.number} - Vigente hasta {data.validUntil ?? 'sin fecha informada'}</Body>
+        <View style={styles.tileRow}>
+          <InfoTile icon="cash-outline" label="Valor asegurado" value={formatCurrency(data.insuredValue)} />
+          <InfoTile icon="checkmark-circle-outline" label="Estado" value="Activa" tone="green" />
+        </View>
         <SummaryLine label="Valor asegurado" value={formatCurrency(data.insuredValue)} bold />
         <SummaryLine label="Cobertura" value={data.coverage ?? 'Sin detalle'} />
       </Card>
@@ -555,6 +547,7 @@ export function ConversationScreen() {
   return (
     <Screen>
       <Header title={title} onBack={() => router.back()} />
+      <StatusPanel icon="chatbubble-ellipses-outline" title="Canal de consulta" message="Usá este espacio para coordinar soporte, entregas o consultas de póliza." />
       {isLoading ? <LoadingState /> : isError ? <ErrorState onRetry={() => refetch()} /> : data?.map((message) => (
         <View key={message.id} style={[styles.bubble, message.author === 'user' && styles.userBubble]}>
           <Text style={[styles.message, message.author === 'user' && styles.userMessage]}>{message.text}</Text>
@@ -641,6 +634,7 @@ export function PaymentAddScreen() {
     <Screen>
       <Header title={label} onBack={() => router.back()} />
       <Title>Agregar {label.toLowerCase()}</Title>
+      <StatusPanel icon="lock-closed-outline" title="Validación del medio" message="La empresa puede revisar los datos antes de habilitarlo para pujas y pagos pendientes." />
       {onboarding === 'true' ? <Button label="Omitir por ahora" variant="ghost" onPress={() => router.replace((returnTo || '/(tabs)') as Href)} /> : null}
       {kind !== 'tarjeta_credito' ? <Input label="Nombre del banco" value={bank} onChangeText={setBank} /> : null}
       {kind === 'cuenta_bancaria' ? <Input label="País del banco" value={country} onChangeText={setCountry} /> : null}
@@ -657,7 +651,7 @@ export function PaymentAddScreen() {
         <Input label="Número de cheque" value={identifier} onChangeText={setIdentifier} />
         <Input label="Monto certificado" value={amount} keyboardType="number-pad" onChangeText={setAmount} />
       </>}
-      {kind === 'cheque_certificado' ? <Button label={photo ? 'Foto cargada' : 'Subir foto del cheque'} variant="secondary" onPress={pickCheque} /> : null}
+      {kind === 'cheque_certificado' ? <UploadBox label={photo ? 'Foto cargada' : 'Subir foto del cheque'} description="Imagen del respaldo certificado" done={!!photo} icon="camera-outline" onPress={pickCheque} /> : null}
       <Button label={save.isPending ? 'Guardando...' : submitLabel} disabled={!canSave || save.isPending} onPress={() => save.mutate()} />
       {save.isError ? <Body muted>{save.error instanceof Error ? save.error.message : 'No fue posible agregar el medio.'}</Body> : null}
     </Screen>
@@ -720,6 +714,7 @@ export function AssetDetailScreen() {
 const styles = StyleSheet.create({
   notice: { alignItems: 'center', marginTop: spacing.huge },
   profileCard: { alignItems: 'center', backgroundColor: colors.surfaceAlt },
+  tileRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, alignSelf: 'stretch' },
   avatar: { width: 62, height: 62, borderRadius: 31, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primarySoft },
   avatarText: { fontFamily: fonts.black, fontSize: 28, color: colors.primary },
   menuItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.md },
