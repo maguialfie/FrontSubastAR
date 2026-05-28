@@ -6,7 +6,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Badge, Body, Button, Card, Header, Input, Screen, Title } from '@/components/ui/primitives';
+import { Badge, Body, Button, Card, Header, InfoTile, Input, Screen, SectionLabel, StatusPanel, StepIndicator, Title, UploadBox } from '@/components/ui/primitives';
 import { colors, fonts, radius, spacing, typography } from '@/constants/theme';
 import { assetService } from '@/services/api';
 import type { FileUpload } from '@/types/domain';
@@ -14,18 +14,7 @@ import type { FileUpload } from '@/types/domain';
 const steps = ['Datos', 'Fotos', 'Documentos', 'Confirmar'];
 
 function WizardHeader({ current }: { current: number }) {
-  return (
-    <View style={styles.steps}>
-      {steps.map((step, index) => (
-        <View style={styles.stepItem} key={step}>
-          <View style={[styles.stepDot, index <= current && styles.stepDotActive]}>
-            <Text style={[styles.stepNumber, index <= current && styles.stepNumberActive]}>{index + 1}</Text>
-          </View>
-          <Text style={styles.stepLabel}>{step}</Text>
-        </View>
-      ))}
-    </View>
-  );
+  return <StepIndicator steps={steps} current={current} />;
 }
 
 export function SellStartScreen() {
@@ -55,6 +44,7 @@ export function SellStartScreen() {
     <Screen>
       <Header title="Subir bien" onBack={() => router.back()} />
       <Title>Categoría del bien</Title>
+      <StatusPanel icon="shield-checkmark-outline" title="Carga formal de bien" message="Completá los datos con precisión para que la empresa pueda revisar documentación, fotos y condiciones de subasta." />
       <View style={styles.categories}>
         {[
           { value: 'obra_arte', label: 'Obras de arte', description: 'Pinturas, esculturas y diseños autorales' },
@@ -73,6 +63,7 @@ export function SellStartScreen() {
       </View>
       {category ? <>
         <WizardHeader current={0} />
+        <SectionLabel>Información operativa</SectionLabel>
         <Title>Datos del bien</Title>
         <Input label="Nombre del bien" placeholder="Ej. Retrato en óleo" value={name} onChangeText={setName} />
         <Input label="Descripción técnica" placeholder="Materiales, medidas y estado" multiline value={description} onChangeText={setDescription} />
@@ -115,6 +106,10 @@ export function SellPhotosScreen() {
       <WizardHeader current={1} />
       <Title>Cargá imágenes</Title>
       <Body muted>Mínimo 6 fotos y máximo 8 fotos requeridas.</Body>
+      <View style={styles.tileRow}>
+        <InfoTile icon="camera-outline" label="Mínimo" value="6 fotos" tone={photos.length >= 6 ? 'green' : 'yellow'} />
+        <InfoTile icon="images-outline" label="Máximo" value="8 fotos" />
+      </View>
       <View style={styles.gallery}>
         {photos.map((file) => (
           <View key={file.uri} style={styles.previewWrap}>
@@ -124,10 +119,7 @@ export function SellPhotosScreen() {
             </Pressable>
           </View>
         ))}
-        <Pressable style={styles.addPhoto} onPress={addPhoto}>
-          <Ionicons name="camera-outline" size={28} color={colors.primary} />
-          <Text style={styles.addText}>Agregá</Text>
-        </Pressable>
+        <UploadBox label="Agregar fotos" description="JPG o PNG" icon="camera-outline" onPress={addPhoto} />
       </View>
       <Badge label={`${photos.length} de 8 fotos cargadas`} tone={photos.length >= 6 ? 'green' : 'yellow'} />
       <Button label={upload.isPending ? 'Subiendo...' : 'Continuar'} disabled={photos.length < 6 || upload.isPending} onPress={() => upload.mutate()} />
@@ -165,12 +157,8 @@ export function SellDocumentsScreen() {
         <Body>Declaro que el bien ofrecido para subasta es de mi exclusiva propiedad y que no se encuentra sujeto a ningún impedimento legal que restrinja su disposición.</Body>
       </Card>
       </Pressable>
-      <Text style={styles.documentTitle}>Documentación preventiva (opcional)</Text>
-      <Pressable style={styles.documentPicker} onPress={addDocument}>
-        <Ionicons name="document-attach-outline" size={28} color={colors.primary} />
-        <Text style={styles.documentTitle}>Adjuntar comprobantes</Text>
-        <Body muted>PDF o imagen, hasta 10 MB</Body>
-      </Pressable>
+      <SectionLabel>Documentación preventiva opcional</SectionLabel>
+      <UploadBox label="Adjuntar comprobantes" description="PDF o imagen, hasta 10 MB" icon="document-attach-outline" done={documents.length > 0} onPress={addDocument} />
       {documents.map((document) => (
         <Card key={document.uri} style={styles.documentRow}>
           <Body>{document.name}</Body>
@@ -205,6 +193,7 @@ export function SellReviewScreen() {
         <Summary label="Documentación" value={`${params.documents} adjuntos`} />
         <Summary label="Declaración de propiedad" value="Aceptada" />
       </Card>
+      <StatusPanel icon="document-text-outline" title="Revisión final" message="Al confirmar, la solicitud pasa a revisión de la empresa y queda pendiente de inspección." tone="yellow" />
       <Button label={confirm.isPending ? 'Enviando...' : 'Confirmar'} disabled={confirm.isPending} onPress={() => confirm.mutate()} />
       {confirm.isError ? <Body muted>{confirm.error instanceof Error ? confirm.error.message : 'No fue posible enviar la solicitud.'}</Body> : null}
       <Button label="Editar bien" variant="secondary" onPress={() => router.back()} />
@@ -222,9 +211,7 @@ export function SellSuccessScreen() {
   const { code, status } = useLocalSearchParams<{ code: string; status: string }>();
   return (
     <Screen style={styles.success}>
-      <Ionicons name="checkmark-circle-outline" size={58} color={colors.success} />
-      <Title>¡Solicitud enviada exitosamente!</Title>
-      <Body muted>Tu bien fue enviado para revisión. Te notificaremos cuando la empresa complete la inspección y te informaremos la fecha, valor base y comisiones.</Body>
+      <StatusPanel icon="checkmark-circle-outline" title="Solicitud enviada exitosamente" message="Tu bien fue enviado para revisión. Te notificaremos cuando la empresa complete la inspección e informe fecha, valor base y comisiones." tone="green" />
       <Card style={styles.fullWidth}>
         <Summary label="Código de solicitud" value={code ?? '-'} />
         <Summary label="Estado" value={status ?? 'Pendiente de revisión'} />
@@ -250,6 +237,7 @@ const styles = StyleSheet.create({
   categoryCopy: { flex: 1, gap: spacing.xs },
   categoryText: { color: colors.text, fontSize: typography.body, fontFamily: fonts.bold },
   categoryDescription: { color: colors.textMuted, fontSize: typography.small, fontFamily: fonts.regular },
+  tileRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
   gallery: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
   previewWrap: { position: 'relative' },
   preview: { height: 94, width: 94, borderRadius: radius.md },
