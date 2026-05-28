@@ -224,13 +224,6 @@ export function SellSuccessScreen() {
 }
 
 const styles = StyleSheet.create({
-  steps: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.xs },
-  stepItem: { alignItems: 'center', gap: spacing.xs, flex: 1 },
-  stepDot: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceAlt },
-  stepDotActive: { backgroundColor: colors.primary },
-  stepNumber: { color: colors.textMuted, fontFamily: fonts.bold },
-  stepNumberActive: { color: '#FFF' },
-  stepLabel: { color: colors.textMuted, fontSize: typography.caption, fontFamily: fonts.regular },
   categories: { gap: spacing.sm },
   category: { flexDirection: 'row', alignItems: 'center', borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, padding: spacing.md, gap: spacing.md },
   categoryActive: { backgroundColor: colors.primarySoft, borderColor: colors.primary },
@@ -242,11 +235,7 @@ const styles = StyleSheet.create({
   previewWrap: { position: 'relative' },
   preview: { height: 94, width: 94, borderRadius: radius.md },
   removePhoto: { position: 'absolute', right: -5, top: -5, height: 23, width: 23, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.danger },
-  addPhoto: { height: 94, width: 94, borderRadius: radius.md, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.primary, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
-  addText: { color: colors.primary, fontSize: typography.small, fontFamily: fonts.medium },
   declaration: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.primarySoft },
-  documentPicker: { minHeight: 150, borderRadius: radius.lg, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.primary, backgroundColor: colors.surfaceAlt, alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
-  documentTitle: { color: colors.primary, fontSize: typography.body, fontFamily: fonts.bold },
   documentRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   summary: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   summaryValue: { color: colors.text, fontFamily: fonts.bold, fontSize: typography.body },
