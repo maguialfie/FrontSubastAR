@@ -7,11 +7,20 @@ import { StyleSheet, Text, View } from 'react-native';
 import { z } from 'zod';
 
 import { BrandLogo } from '@/components/brand/logo';
-import { ActionRow, Body, Button, Header, InfoTile, Input, Screen, SectionLabel, StatusPanel, StepIndicator, Title, UploadBox } from '@/components/ui/primitives';
+import { ActionRow, Body, Button, Card, Header, InfoTile, Input, Screen, SectionLabel, StatusPanel, StepIndicator, Title, UploadBox } from '@/components/ui/primitives';
 import { colors, fonts, spacing, typography } from '@/constants/theme';
+import { useSafeBack } from '@/hooks/use-safe-back';
 import { useSession } from '@/providers/app-provider';
 import { authService } from '@/services/api';
 import type { FileUpload } from '@/types/domain';
+
+function ErrorNotice({ message }: { message: string }) {
+  return (
+    <Card style={styles.errorCard}>
+      <Text style={styles.error}>{message}</Text>
+    </Card>
+  );
+}
 
 const loginSchema = z.object({
   email: z.email('Ingresá un correo válido.'),
@@ -45,7 +54,10 @@ export function SplashScreen() {
   }, [loading, router, session]);
   return (
     <Screen scroll={false} style={styles.splash}>
-      <BrandLogo iconSize={112} />
+      <Card style={styles.splashCard}>
+        <BrandLogo iconSize={112} />
+        <Body muted>Subastas online con una experiencia premium, clara y confiable.</Body>
+      </Card>
     </Screen>
   );
 }
@@ -55,7 +67,7 @@ export function WelcomeScreen() {
   const { enterAsGuest } = useSession();
   return (
     <Screen style={styles.welcome}>
-      <View style={styles.welcomeHero}>
+      <Card style={styles.welcomeHero}>
         <BrandLogo iconSize={88} />
         <View style={styles.centerCopy}>
           <Title>Descubrí objetos únicos</Title>
@@ -65,18 +77,19 @@ export function WelcomeScreen() {
           <InfoTile icon="shield-checkmark-outline" label="Cuenta" value="Validación segura" />
           <InfoTile icon="hammer-outline" label="Subastas" value="Pujas en vivo" />
         </View>
-      </View>
-      <View style={styles.actions}>
+      </Card>
+      <Card style={styles.actionsCard}>
         <Button label="Iniciar sesión" onPress={() => router.push('/login')} />
         <Button label="Crear cuenta" variant="secondary" onPress={() => router.push('/register')} />
         <Button label="Continuar como invitado" variant="ghost" onPress={() => { enterAsGuest(); router.replace('/(tabs)'); }} />
-      </View>
+      </Card>
     </Screen>
   );
 }
 
 export function LoginScreen() {
   const router = useRouter();
+  const back = useSafeBack();
   const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
   const { enterAsGuest, signIn } = useSession();
   const [apiError, setApiError] = useState('');
@@ -95,31 +108,33 @@ export function LoginScreen() {
   });
   return (
     <Screen>
-      <Header title="Iniciar sesión" onBack={() => router.back()} />
-      <Title>Bienvenido, qué bueno verte otra vez</Title>
-      <StatusPanel icon="lock-closed-outline" title="Acceso seguro" message="Ingresá para pujar, vender bienes, revisar compras y administrar tus medios de pago." />
-      <Controller control={control} name="email" render={({ field: { onChange, value } }) => (
-        <Input label="Correo electrónico" keyboardType="email-address" autoCapitalize="none" value={value} onChangeText={onChange} error={errors.email?.message} />
-      )} />
-      <Controller control={control} name="password" render={({ field: { onChange, value } }) => (
-        <Input label="Contraseña" secureTextEntry value={value} onChangeText={onChange} error={errors.password?.message} />
-      )} />
-      <Button label="¿Olvidaste tu contraseña?" variant="ghost" onPress={() => setApiError('La recuperación de contraseña todavía no está disponible.')} />
-      {apiError ? <Text style={styles.error}>{apiError}</Text> : null}
-      <Button label={isSubmitting ? 'Ingresando...' : 'Iniciar sesión'} disabled={isSubmitting} onPress={submit} />
-      <Button label="¿No tienes una cuenta? Regístrate" variant="ghost" onPress={() => router.push({ pathname: '/register', params: { returnTo } })} />
-      <Body muted>O</Body>
-      <Button label="Continúa como un invitado" variant="ghost" onPress={() => { enterAsGuest(); router.replace('/(tabs)'); }} />
+      <Header title="Iniciar sesión" onBack={back} />
+      <Card style={styles.formCard}>
+        <Title>Bienvenido, qué bueno verte otra vez</Title>
+        <StatusPanel icon="lock-closed-outline" title="Acceso seguro" message="Ingresá para pujar, vender bienes, revisar compras y administrar tus medios de pago." />
+        <Controller control={control} name="email" render={({ field: { onChange, value } }) => (
+          <Input label="Correo electrónico" keyboardType="email-address" autoCapitalize="none" value={value} onChangeText={onChange} error={errors.email?.message} />
+        )} />
+        <Controller control={control} name="password" render={({ field: { onChange, value } }) => (
+          <Input label="Contraseña" secureTextEntry value={value} onChangeText={onChange} error={errors.password?.message} />
+        )} />
+        {apiError ? <ErrorNotice message={apiError} /> : null}
+        <Button label={isSubmitting ? 'Ingresando...' : 'Iniciar sesión'} disabled={isSubmitting} onPress={submit} />
+        <Button label="¿No tienes una cuenta? Regístrate" variant="ghost" onPress={() => router.push({ pathname: '/register', params: { returnTo } })} />
+        <View style={styles.centerSeparator}><Body muted>O</Body></View>
+        <Button label="Continúa como un invitado" variant="ghost" onPress={() => { enterAsGuest(); router.replace('/(tabs)'); }} />
+      </Card>
     </Screen>
   );
 }
 
 export function RegisterScreen() {
   const router = useRouter();
+  const goBack = useSafeBack();
   const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
   const { setRegistration } = useSession();
   const [front, setFront] = useState<FileUpload>();
-  const [back, setBack] = useState<FileUpload>();
+  const [backImage, setBackImage] = useState<FileUpload>();
   const [apiError, setApiError] = useState('');
   const { control, handleSubmit, formState: { errors, isSubmitting } } = useForm<z.infer<typeof registerSchema>>({
     resolver: zodResolver(registerSchema),
@@ -136,17 +151,17 @@ export function RegisterScreen() {
         file: asset.file,
       };
       if (side === 'front') setFront(upload);
-      else setBack(upload);
+      else setBackImage(upload);
     }
   }
   const submit = handleSubmit(async (values) => {
-    if (!front || !back) {
+    if (!front || !backImage) {
       setApiError('Adjunta frente y dorso del DNI.');
       return;
     }
     try {
       setApiError('');
-      await authService.register({ ...values, front, back });
+      await authService.register({ ...values, front, back: backImage });
       setRegistration({ email: values.email, returnTo });
       router.push('/registration-pending' as Href);
     } catch (error) {
@@ -155,23 +170,25 @@ export function RegisterScreen() {
   });
   return (
     <Screen>
-      <Header title="Crear cuenta" subtitle="Paso 1 de 4" onBack={() => router.back()} />
-      <StepIndicator steps={registrationSteps} current={0} />
-      <Title>Datos personales</Title>
-      <Body muted>Usamos estos datos para validar tu identidad antes de habilitar pujas y operaciones de venta.</Body>
-      <Controller control={control} name="name" render={({ field }) => <Input label="Nombre" value={field.value} onChangeText={field.onChange} error={errors.name?.message} />} />
-      <Controller control={control} name="surname" render={({ field }) => <Input label="Apellido" value={field.value} onChangeText={field.onChange} error={errors.surname?.message} />} />
-      <Controller control={control} name="email" render={({ field }) => <Input label="Mail" value={field.value} onChangeText={field.onChange} keyboardType="email-address" error={errors.email?.message} />} />
-      <Controller control={control} name="address" render={({ field }) => <Input label="Domicilio legal" value={field.value} onChangeText={field.onChange} error={errors.address?.message} />} />
-      <Controller control={control} name="country" render={({ field }) => <Input label="País de origen" value={field.value} onChangeText={field.onChange} error={errors.country?.message} />} />
-      <SectionLabel>Documento de identidad</SectionLabel>
-      <View style={styles.uploadRow}>
-        <UploadAction label="Frente" done={!!front} onPress={() => pick('front')} />
-        <UploadAction label="Dorso" done={!!back} onPress={() => pick('back')} />
-      </View>
-      {apiError ? <Text style={styles.error}>{apiError}</Text> : null}
-      <Button label={isSubmitting ? 'Enviando...' : 'Crear cuenta'} disabled={isSubmitting} onPress={submit} />
-      <Button label="¿Ya tienes una cuenta? Iniciá sesión" variant="ghost" onPress={() => router.push({ pathname: '/login', params: { returnTo } })} />
+      <Header title="Crear cuenta" subtitle="Paso 1 de 4" onBack={goBack} />
+      <Card style={styles.formCard}>
+        <StepIndicator steps={registrationSteps} current={0} />
+        <Title>Datos personales</Title>
+        <Body muted>Usamos estos datos para validar tu identidad antes de habilitar pujas y operaciones de venta.</Body>
+        <Controller control={control} name="name" render={({ field }) => <Input label="Nombre" value={field.value} onChangeText={field.onChange} error={errors.name?.message} />} />
+        <Controller control={control} name="surname" render={({ field }) => <Input label="Apellido" value={field.value} onChangeText={field.onChange} error={errors.surname?.message} />} />
+        <Controller control={control} name="email" render={({ field }) => <Input label="Mail" value={field.value} onChangeText={field.onChange} keyboardType="email-address" error={errors.email?.message} />} />
+        <Controller control={control} name="address" render={({ field }) => <Input label="Domicilio legal" value={field.value} onChangeText={field.onChange} error={errors.address?.message} />} />
+        <Controller control={control} name="country" render={({ field }) => <Input label="País de origen" value={field.value} onChangeText={field.onChange} error={errors.country?.message} />} />
+        <SectionLabel>Documento de identidad</SectionLabel>
+        <View style={styles.uploadRow}>
+          <UploadAction label="Frente" done={!!front} onPress={() => pick('front')} />
+          <UploadAction label="Dorso" done={!!backImage} onPress={() => pick('back')} />
+        </View>
+        {apiError ? <ErrorNotice message={apiError} /> : null}
+        <Button label={isSubmitting ? 'Enviando...' : 'Crear cuenta'} disabled={isSubmitting} onPress={submit} />
+        <Button label="¿Ya tienes una cuenta? Iniciá sesión" variant="ghost" onPress={() => router.push({ pathname: '/login', params: { returnTo } })} />
+      </Card>
     </Screen>
   );
 }
@@ -185,16 +202,19 @@ export function RegistrationPendingScreen() {
   const { registration } = useSession();
   return (
     <Screen style={styles.pending}>
-      <StatusPanel icon="mail-unread-outline" title="Solicitud enviada" message="Recibimos tus datos y las imágenes del DNI. Cuando tu cuenta sea aprobada, recibirás el código por correo." tone="green" />
-      {registration?.email ? <Text style={styles.pendingEmail}>{registration.email}</Text> : null}
-      <Button label="Ya recibí mi código" onPress={() => router.push('/verify')} />
-      <Button label="Volver al acceso" variant="ghost" onPress={() => router.replace('/welcome')} />
+      <Card style={styles.formCard}>
+        <StatusPanel icon="mail-unread-outline" title="Solicitud enviada" message="Recibimos tus datos y las imágenes del DNI. Cuando tu cuenta sea aprobada, recibirás el código por correo." tone="green" />
+        {registration?.email ? <Text style={styles.pendingEmail}>{registration.email}</Text> : null}
+        <Button label="Ya recibí mi código" onPress={() => router.push('/verify')} />
+        <Button label="Volver al acceso" variant="ghost" onPress={() => router.replace('/welcome')} />
+      </Card>
     </Screen>
   );
 }
 
 export function VerifyScreen() {
   const router = useRouter();
+  const back = useSafeBack();
   const { registration, setRegistration } = useSession();
   const [apiError, setApiError] = useState('');
   const { control, handleSubmit, formState: { errors, isSubmitting } } = useForm<z.infer<typeof verifySchema>>({
@@ -215,21 +235,24 @@ export function VerifyScreen() {
   });
   return (
     <Screen>
-      <Header title="Verifica el código" subtitle="Paso 2 de 4" onBack={() => router.back()} />
-      <StepIndicator steps={registrationSteps} current={1} />
-      <StatusPanel icon="mail-outline" title="Código de verificación" message="Ingresá el código enviado por correo para continuar con la creación de tu cuenta." />
-      {registration?.email ? <Text style={styles.pendingEmail}>{registration.email}</Text> : null}
-      <Controller control={control} name="code" render={({ field }) => <Input label="Código de verificación" placeholder="0000" keyboardType="number-pad" value={field.value} onChangeText={field.onChange} error={errors.code?.message} />} />
-      {apiError ? <Text style={styles.error}>{apiError}</Text> : null}
-      <Body muted>¿No recibiste el código?</Body>
-      <Button label="Reenviar" variant="ghost" onPress={() => setApiError('La opción de reenvío todavía no está disponible.')} />
-      <Button label={isSubmitting ? 'Verificando...' : 'Verificar'} disabled={isSubmitting} onPress={submit} />
+      <Header title="Verifica el código" subtitle="Paso 2 de 4" onBack={back} />
+      <Card style={styles.formCard}>
+        <StepIndicator steps={registrationSteps} current={1} />
+        <StatusPanel icon="mail-outline" title="Código de verificación" message="Ingresá el código enviado por correo para continuar con la creación de tu cuenta." />
+        {registration?.email ? <Text style={styles.pendingEmail}>{registration.email}</Text> : null}
+        <Controller control={control} name="code" render={({ field }) => <Input label="Código de verificación" placeholder="0000" keyboardType="number-pad" value={field.value} onChangeText={field.onChange} error={errors.code?.message} />} />
+        {apiError ? <ErrorNotice message={apiError} /> : null}
+        <Body muted>¿No recibiste el código?</Body>
+        <Button label="Reenviar" variant="ghost" onPress={() => setApiError('La opción de reenvío todavía no está disponible.')} />
+        <Button label={isSubmitting ? 'Verificando...' : 'Verificar'} disabled={isSubmitting} onPress={submit} />
+      </Card>
     </Screen>
   );
 }
 
 export function PasswordScreen() {
   const router = useRouter();
+  const back = useSafeBack();
   const { registration, signIn, setRegistration } = useSession();
   const [apiError, setApiError] = useState('');
   const { control, handleSubmit, formState: { errors, isSubmitting } } = useForm<z.infer<typeof passwordSchema>>({
@@ -251,47 +274,56 @@ export function PasswordScreen() {
   });
   return (
     <Screen>
-      <Header title="Seguridad" subtitle="Paso 3 de 4" onBack={() => router.back()} />
-      <StepIndicator steps={registrationSteps} current={2} />
-      <Title>Crea tu contraseña</Title>
-      <Body muted>Elegí una contraseña segura para proteger tus pujas, compras y documentación.</Body>
-      <Controller control={control} name="password" render={({ field }) => <Input label="Contraseña" secureTextEntry value={field.value} onChangeText={field.onChange} error={errors.password?.message} />} />
-      <Controller control={control} name="confirmation" render={({ field }) => <Input label="Confirma tu contraseña" secureTextEntry value={field.value} onChangeText={field.onChange} error={errors.confirmation?.message} />} />
-      {apiError ? <Text style={styles.error}>{apiError}</Text> : null}
-      <Button label={isSubmitting ? 'Creando cuenta...' : 'Registrarse'} disabled={isSubmitting} onPress={submit} />
+      <Header title="Seguridad" subtitle="Paso 3 de 4" onBack={back} />
+      <Card style={styles.formCard}>
+        <StepIndicator steps={registrationSteps} current={2} />
+        <Title>Crea tu contraseña</Title>
+        <Body muted>Elegí una contraseña segura para proteger tus pujas, compras y documentación.</Body>
+        <Controller control={control} name="password" render={({ field }) => <Input label="Contraseña" secureTextEntry value={field.value} onChangeText={field.onChange} error={errors.password?.message} />} />
+        <Controller control={control} name="confirmation" render={({ field }) => <Input label="Confirma tu contraseña" secureTextEntry value={field.value} onChangeText={field.onChange} error={errors.confirmation?.message} />} />
+        {apiError ? <ErrorNotice message={apiError} /> : null}
+        <Button label={isSubmitting ? 'Creando cuenta...' : 'Registrarse'} disabled={isSubmitting} onPress={submit} />
+      </Card>
     </Screen>
   );
 }
 
 export function OnboardingPaymentScreen() {
   const router = useRouter();
+  const back = useSafeBack();
   const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
   return (
     <Screen>
-      <Header title="Seleccioná un medio de pago" subtitle="Paso 4 de 4" onBack={() => router.back()} />
-      <StepIndicator steps={registrationSteps} current={3} />
-      <StatusPanel icon="card-outline" title="Medio de pago requerido para pujar" message="Podés explorar subastas, pero para ofertar necesitás al menos un medio aprobado por la empresa." tone="yellow" />
-      <SectionLabel>Agregar medio de pago</SectionLabel>
-      {[
-        { label: 'Cuenta bancaria', type: 'cuenta_bancaria', description: 'Reservá fondos para operar en subastas.' },
-        { label: 'Tarjeta de crédito', type: 'tarjeta_credito', description: 'Usá una tarjeta a nombre del titular.' },
-        { label: 'Cheque certificado', type: 'cheque_certificado', description: 'Adjuntá el respaldo del cheque para revisión.' },
-      ].map((option, index) => (
-        <ActionRow key={option.type} icon={index === 0 ? 'business-outline' : index === 1 ? 'card-outline' : 'wallet-outline'} label={option.label} description={option.description} onPress={() => router.push({ pathname: '/profile/payments/add', params: { type: option.type, onboarding: 'true', returnTo } })} />
-      ))}
-      <Button label="Omitir por ahora" variant="ghost" onPress={() => router.replace((returnTo || '/(tabs)') as Href)} />
+      <Header title="Seleccioná un medio de pago" subtitle="Paso 4 de 4" onBack={back} />
+      <Card style={styles.formCard}>
+        <StepIndicator steps={registrationSteps} current={3} />
+        <StatusPanel icon="card-outline" title="Medio de pago requerido para pujar" message="Podés explorar subastas, pero para ofertar necesitás al menos un medio aprobado por la empresa." tone="yellow" />
+        <SectionLabel>Agregar medio de pago</SectionLabel>
+        {[
+          { label: 'Cuenta bancaria', type: 'cuenta_bancaria', description: 'Reservá fondos para operar en subastas.' },
+          { label: 'Tarjeta de crédito', type: 'tarjeta_credito', description: 'Usá una tarjeta a nombre del titular.' },
+          { label: 'Cheque certificado', type: 'cheque_certificado', description: 'Adjuntá el respaldo del cheque para revisión.' },
+        ].map((option, index) => (
+          <ActionRow key={option.type} icon={index === 0 ? 'business-outline' : index === 1 ? 'card-outline' : 'wallet-outline'} label={option.label} description={option.description} onPress={() => router.push({ pathname: '/profile/payments/add', params: { type: option.type, onboarding: 'true', returnTo } })} />
+        ))}
+        <Button label="Omitir por ahora" variant="ghost" onPress={() => router.replace((returnTo || '/(tabs)') as Href)} />
+      </Card>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
   splash: { alignItems: 'center', justifyContent: 'center', gap: spacing.md },
+  splashCard: { alignItems: 'center', gap: spacing.sm, width: '100%', maxWidth: 360 },
   welcome: { justifyContent: 'space-between' },
-  welcomeHero: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.lg },
+  welcomeHero: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.lg, backgroundColor: colors.surfaceAlt },
+  actionsCard: { gap: spacing.md },
+  formCard: { gap: spacing.md },
   centerCopy: { alignItems: 'center', gap: spacing.sm },
+  centerSeparator: { alignItems: 'center' },
   tileRow: { flexDirection: 'row', gap: spacing.md, alignSelf: 'stretch' },
-  actions: { gap: spacing.md },
-  error: { color: colors.danger, fontSize: typography.small, fontFamily: fonts.regular },
+  errorCard: { backgroundColor: colors.dangerSoft, borderColor: '#F7C9C9', paddingVertical: spacing.sm },
+  error: { color: colors.danger, fontSize: typography.small, fontFamily: fonts.bold, textAlign: 'center' },
   uploadRow: { flexDirection: 'row', gap: spacing.md },
   pending: { justifyContent: 'center' },
   pendingEmail: { color: colors.primary, fontSize: typography.body, fontFamily: fonts.medium },

@@ -79,6 +79,9 @@ export interface OwnedAsset {
   category: string;
   status: 'Pendiente' | 'Aceptado' | 'Rechazado';
   detail: string;
+  technicalDescription?: string;
+  quantity?: number;
+  additionalInformation?: string;
   basePrice?: number;
   commission?: number;
   depositLocation?: string;
@@ -142,6 +145,15 @@ export interface UserDetails extends UserProfile {
   address?: string;
   country?: string;
   dni?: string;
+}
+
+export interface Country {
+  id: string;
+  code: string;
+  name: string;
+  capital?: string;
+  nationality?: string;
+  languages?: string;
 }
 
 export type PaymentMethodKind = 'cuenta_bancaria' | 'tarjeta_credito' | 'cheque_certificado';

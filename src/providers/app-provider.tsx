@@ -1,13 +1,10 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import * as SecureStore from 'expo-secure-store';
 import { usePathname, useRouter } from 'expo-router';
 import { createContext, type PropsWithChildren, useContext, useEffect, useMemo, useState } from 'react';
-import { Platform } from 'react-native';
 
 import type { RegistrationDraft, Session } from '@/types/domain';
 import { setUnauthorizedHandler } from '@/services/http';
-
-const SESSION_KEY = 'subastar.session';
+import { readSession, storeSession } from '@/services/session-storage';
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
 });
@@ -25,21 +22,6 @@ type SessionValue = {
 
 const SessionContext = createContext<SessionValue | undefined>(undefined);
 
-async function readSession() {
-  if (Platform.OS === 'web') return globalThis.localStorage?.getItem(SESSION_KEY) ?? null;
-  return SecureStore.getItemAsync(SESSION_KEY);
-}
-
-async function storeSession(value: string | null) {
-  if (Platform.OS === 'web') {
-    if (value) globalThis.localStorage?.setItem(SESSION_KEY, value);
-    else globalThis.localStorage?.removeItem(SESSION_KEY);
-    return;
-  }
-  if (value) await SecureStore.setItemAsync(SESSION_KEY, value);
-  else await SecureStore.deleteItemAsync(SESSION_KEY);
-}
-
 export function AppProvider({ children }: PropsWithChildren) {
   const router = useRouter();
   const pathname = usePathname();
@@ -50,7 +32,7 @@ export function AppProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     readSession()
-      .then((stored) => stored && setSession(JSON.parse(stored) as Session))
+      .then((stored) => stored && setSession(stored))
       .finally(() => setLoading(false));
   }, []);
 
@@ -60,7 +42,7 @@ export function AppProvider({ children }: PropsWithChildren) {
       setGuest(false);
       await storeSession(null);
       queryClient.clear();
-      router.replace({ pathname: '/login', params: { returnTo: pathname } });
+      router.replace('/');
     });
     return () => setUnauthorizedHandler(undefined);
   }, [pathname, router]);
@@ -74,7 +56,7 @@ export function AppProvider({ children }: PropsWithChildren) {
     async signIn(nextSession) {
       setSession(nextSession);
       setGuest(false);
-      await storeSession(JSON.stringify(nextSession));
+      await storeSession(nextSession);
     },
     enterAsGuest() {
       setGuest(true);

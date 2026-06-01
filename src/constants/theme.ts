@@ -3,14 +3,22 @@ import { Platform } from 'react-native';
 export const colors = {
   primary: '#5C4ACF',
   primaryDark: '#302477',
+  primaryDeep: '#442EB6',
   primarySoft: '#EFECFF',
+  primaryFixed: '#E4DFFF',
   primaryBorder: '#D8D1FF',
-  background: '#FFFFFF',
+  inversePrimary: '#C7BFFF',
+  background: '#FAF8FF',
   surface: '#FFFFFF',
   surfaceAlt: '#F7F6FD',
-  text: '#17171F',
+  surfaceContainer: '#F2F3FF',
+  surfaceContainerHigh: '#E4E7F8',
+  text: '#171B27',
+  textStrong: '#17171F',
   textMuted: '#6F7381',
+  textVariant: '#474554',
   border: '#E5E4ED',
+  outline: '#787585',
   success: '#25B85A',
   successSoft: '#E8F8EE',
   danger: '#EF4444',
@@ -35,16 +43,21 @@ export const radius = {
   md: 12,
   lg: 16,
   xl: 22,
+  xxl: 28,
   pill: 999,
 } as const;
 
 export const typography = {
-  display: 30,
-  title: 24,
+  display: 32,
+  title: 26,
+  headline: 22,
   heading: 18,
-  body: 14,
-  small: 12,
-  caption: 11,
+  subheading: 18,
+  body: 16,
+  bodySmall: 14,
+  small: 14,
+  label: 13,
+  caption: 12,
 } as const;
 
 export const fonts = {
@@ -58,10 +71,10 @@ export const shadow = Platform.select({
   ios: {
     shadowColor: '#302477',
     shadowOpacity: 0.08,
-    shadowOffset: { width: 0, height: 5 },
-    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    shadowRadius: 16,
   },
-  default: { elevation: 2 },
+  default: { elevation: 3 },
 });
 
 export const deepShadow = Platform.select({
@@ -82,5 +95,5 @@ export const Colors = {
 export type ThemeColor = keyof typeof Colors.light;
 export const Fonts = { sans: fonts.regular, serif: 'serif', rounded: fonts.medium, mono: 'monospace' };
 export const Spacing = { half: 2, one: 4, two: 8, three: 16, four: 24, five: 32, six: 64 };
-export const BottomTabInset = 72;
 export const MaxContentWidth = 800;
+export const LayoutMetrics = { bottomTabInset: 72, maxContentWidth: MaxContentWidth };

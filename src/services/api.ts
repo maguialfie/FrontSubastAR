@@ -49,7 +49,8 @@ type BackendLive = {
 type BackendPayment = { id: number; tipo: string; descripcion: string; verificado: boolean; monto_disponible?: number };
 type BackendAsset = {
   id: number; nombre: string; estado: string; motivo_rechazo?: string; subasta_asignada?: string; precio_base?: number;
-  comision?: number; ubicacion_deposito?: string; poliza_id?: number; fotos_cargadas?: number; documentacion_adjunta?: boolean;
+  comision?: number; ubicacion_deposito?: string; poliza_id?: number; descripcion_tecnica?: string; cantidad_elementos?: number;
+  informacion_adicional?: string; fotos_cargadas?: number; documentacion_adjunta?: boolean;
 };
 type BackendPurchase = {
   id: number; nombre_item: string; subasta: string; fecha?: string; valor_pujado: number; multa: number;
@@ -59,6 +60,8 @@ type BackendPurchase = {
 type BackendConversation = { tipo: string; titulo: string; subtitulo: string; mensajes_no_leidos: number };
 type BackendMessage = { id: number; emisor: string; contenido: string; timestamp: string };
 type BackendProfile = BackendUser & { domicilio?: string; paisOrigen?: string; pais_origen?: string; dni?: string };
+type BackendCountry = { numero: number; nombre: string; nombreCorto: string; capital: string; nacionalidad: string; idiomas: string };
+type CountryOption = { id: string; code: string; name: string; capital?: string; nationality?: string; languages?: string };
 type BackendMetrics = {
   subastas_participadas: number; subastas_ganadas: number; tasa_exito: number; total_ofertado: number; total_pagado: number;
   oferta_promedio: number; oferta_mas_alta: number; oferta_mas_baja: number; ganadas_por_mes: { mes: string; cantidad: number }[];
@@ -146,12 +149,22 @@ function mapPurchase(purchase: BackendPurchase): Purchase {
 }
 
 function mapAsset(asset: BackendAsset): OwnedAsset {
+  const normalizedStatus = asset.estado.toLowerCase();
   return {
-    id: String(asset.id), title: asset.nombre, category: asset.subasta_asignada ?? 'Sin asignar',
-    status: asset.estado.toLowerCase() === 'aceptado' ? 'Aceptado' : asset.estado.toLowerCase() === 'rechazado' ? 'Rechazado' : 'Pendiente',
-    detail: asset.motivo_rechazo ?? asset.subasta_asignada ?? 'En evaluación', basePrice: asset.precio_base,
-    commission: asset.comision, depositLocation: asset.ubicacion_deposito, policyId: asset.poliza_id ? String(asset.poliza_id) : undefined,
-    photosUploaded: asset.fotos_cargadas, documentationAttached: asset.documentacion_adjunta,
+    id: String(asset.id),
+    title: asset.nombre,
+    category: asset.subasta_asignada ?? 'Sin asignar',
+    status: normalizedStatus === 'aceptado' ? 'Aceptado' : normalizedStatus === 'rechazado' ? 'Rechazado' : 'Pendiente',
+    detail: asset.descripcion_tecnica ?? asset.motivo_rechazo ?? asset.subasta_asignada ?? 'En evaluación',
+    technicalDescription: asset.descripcion_tecnica,
+    quantity: asset.cantidad_elementos,
+    additionalInformation: asset.informacion_adicional,
+    basePrice: asset.precio_base,
+    commission: asset.comision,
+    depositLocation: asset.ubicacion_deposito,
+    policyId: asset.poliza_id ? String(asset.poliza_id) : undefined,
+    photosUploaded: asset.fotos_cargadas,
+    documentationAttached: asset.documentacion_adjunta,
   };
 }
 
@@ -225,8 +238,18 @@ export const authService = {
 export const auctionService = {
   async list(filters?: { search?: string; status?: string; category?: string; currency?: string }): Promise<Auction[]> {
     const params = new URLSearchParams();
-    const statusValue = { 'En vivo': 'en_vivo', 'Próximas': 'proxima', Finalizada: 'finalizada' }[filters?.status ?? ''];
-    const categoryValue = { Oro: 'oro', Platino: 'platino', Plata: 'plata', Especial: 'especial', 'Común': 'comun' }[filters?.category ?? ''];
+    const statusValue = filters?.status === 'En vivo' ? 'en_vivo' : filters?.status === 'Próximas' ? 'proxima' : filters?.status === 'Finalizada' ? 'finalizada' : undefined;
+    const categoryValue = filters?.category === 'Oro'
+      ? 'oro'
+      : filters?.category === 'Platino'
+        ? 'platino'
+        : filters?.category === 'Plata'
+          ? 'plata'
+          : filters?.category === 'Especial'
+            ? 'especial'
+            : filters?.category === 'Común'
+              ? 'comun'
+              : undefined;
     if (filters?.search) params.set('busqueda', filters.search);
     if (statusValue) params.set('estado', statusValue);
     if (categoryValue) params.set('categoria', categoryValue);
@@ -273,6 +296,16 @@ export const auctionService = {
 };
 
 export const profileService = {
+  async countries(): Promise<CountryOption[]> {
+    return (await request<BackendCountry[]>(apiRoutes.countries)).map((country) => ({
+      id: String(country.numero),
+      code: country.nombreCorto,
+      name: country.nombre,
+      capital: country.capital,
+      nationality: country.nacionalidad,
+      languages: country.idiomas,
+    }));
+  },
   async me(): Promise<UserDetails> {
     const value = await request<BackendProfile>(apiRoutes.user);
     return {
@@ -378,7 +411,13 @@ export const insuranceService = {
 
 export const assetService = {
   async list(status?: string): Promise<OwnedAsset[]> {
-    const route = status && status !== 'Todos' ? `${apiRoutes.assets}?estado=${status.toLowerCase()}` : apiRoutes.assets;
+    const statusMap: Record<string, string> = {
+      Pendiente: 'en_revision',
+      Aceptado: 'aceptado',
+      Rechazado: 'rechazado',
+    };
+    const backendStatus = status ? statusMap[status] : undefined;
+    const route = backendStatus ? `${apiRoutes.assets}?estado=${backendStatus}` : apiRoutes.assets;
     return (await request<BackendAsset[]>(route)).map(mapAsset);
   },
   async get(id: string): Promise<OwnedAsset> {

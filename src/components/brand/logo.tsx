@@ -30,9 +30,9 @@ export function BrandWordmark({ compact = false }: { compact?: boolean }) {
   );
 }
 
-export function BrandLogo({ iconSize = 88 }: { iconSize?: number }) {
+export function BrandLogo({ iconSize = 88, centered = true }: { iconSize?: number; centered?: boolean }) {
   return (
-    <View style={styles.lockup}>
+    <View style={[styles.lockup, centered && styles.lockupCentered]}>
       <BrandIcon size={iconSize} />
       <BrandWordmark />
     </View>
@@ -65,7 +65,8 @@ const styles = StyleSheet.create({
   sparkOne: { backgroundColor: '#FFF', borderRadius: 2, height: 3, left: 29, position: 'absolute', top: 65, transform: [{ rotate: '40deg' }], width: 9 },
   sparkTwo: { backgroundColor: '#FFF', borderRadius: 2, height: 3, left: 28, position: 'absolute', top: 72, width: 7 },
   lockup: { alignItems: 'center', gap: 10 },
-  wordmark: { color: colors.primaryDark, fontSize: 25, fontFamily: fonts.black, letterSpacing: -0.6 },
-  compact: { fontSize: 17, width: 78, letterSpacing: -0.3 },
+  lockupCentered: { alignSelf: 'center' },
+  wordmark: { color: colors.primaryDark, fontSize: 26, fontFamily: fonts.black, letterSpacing: -0.6 },
+  compact: { fontSize: 17, width: 78, letterSpacing: -0.3, lineHeight: 20 },
   accent: { color: colors.primary },
 });

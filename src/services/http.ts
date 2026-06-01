@@ -1,9 +1,4 @@
-import * as SecureStore from 'expo-secure-store';
-import { Platform } from 'react-native';
-
-import type { Session } from '@/types/domain';
-
-const SESSION_KEY = 'subastar.session';
+import { getToken } from '@/services/session-storage';
 let unauthorizedHandler: undefined | (() => void | Promise<void>);
 
 export function setUnauthorizedHandler(handler?: () => void | Promise<void>) {
@@ -20,6 +15,7 @@ export const apiRoutes = {
   verifyCode: '/auth/verificar-codigo',
   finishRegistration: '/auth/completar-registro',
   logout: '/auth/logout',
+  countries: '/paises',
   auctions: '/subastas',
   auction: (id: string) => `/subastas/${id}`,
   catalog: (id: string) => `/subastas/${id}/catalogo`,
@@ -98,14 +94,6 @@ async function extractErrorMessage(response: Response): Promise<string> {
   return fallback;
 }
 
-async function getToken() {
-  const stored = Platform.OS === 'web'
-    ? globalThis.localStorage?.getItem(SESSION_KEY)
-    : await SecureStore.getItemAsync(SESSION_KEY);
-  if (!stored) return undefined;
-  return (JSON.parse(stored) as Session).token;
-}
-
 export async function request<T>(route: string, options?: RequestInit): Promise<T> {
   const token = await getToken();
   const headers = new Headers(options?.headers);
@@ -114,7 +102,7 @@ export async function request<T>(route: string, options?: RequestInit): Promise<
   const response = await fetch(`${apiConfig.baseUrl}${route}`, { ...options, headers });
   if (!response.ok) {
     const message = await extractErrorMessage(response);
-    if (response.status === 401 && token && unauthorizedHandler) await unauthorizedHandler();
+    if (response.status === 401 && unauthorizedHandler) await unauthorizedHandler();
     throw new ApiError(message, response.status);
   }
   if (response.status === 204) return undefined as T;
@@ -128,7 +116,7 @@ export async function requestText(route: string, options?: RequestInit): Promise
   const response = await fetch(`${apiConfig.baseUrl}${route}`, { ...options, headers });
   if (!response.ok) {
     const message = await extractErrorMessage(response);
-    if (response.status === 401 && token && unauthorizedHandler) await unauthorizedHandler();
+    if (response.status === 401 && unauthorizedHandler) await unauthorizedHandler();
     throw new ApiError(message, response.status);
   }
   return response.text();

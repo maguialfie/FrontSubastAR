@@ -2,15 +2,89 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { PaymentMethodCard, PurchaseCard, formatCurrency } from '@/components/domain/cards';
-import { ActionRow, Badge, Body, Button, Card, ConfirmationModal, EmptyState, ErrorState, Header, InfoTile, Input, LoadingState, Screen, SectionLabel, StatusPanel, Title, UploadBox } from '@/components/ui/primitives';
+import { ActionRow, Badge, Body, Button, Card, ConfirmationModal, Divider, EmptyState, ErrorState, Header, IconButton, InfoTile, Input, LoadingState, Screen, SectionHeader, SecurityNote, SelectInput, StatusState, Title, UploadBox } from '@/components/ui/primitives';
 import { colors, fonts, radius, spacing, typography } from '@/constants/theme';
+import { useSafeBack } from '@/hooks/use-safe-back';
 import { useSession } from '@/providers/app-provider';
 import { assetService, authService, chatService, insuranceService, paymentService, profileService, purchaseService } from '@/services/api';
-import type { FileUpload, PaymentMethodKind } from '@/types/domain';
+import type { Country, FileUpload, PaymentMethodKind } from '@/types/domain';
+
+function FilterTabs<T extends string>({ options, value, onChange }: { options: readonly T[]; value: T; onChange: (next: T) => void }) {
+  return (
+    <View style={styles.filters}>
+      {options.map((option) => (
+        <Pressable key={option} style={[styles.filter, value === option && styles.filterActive]} onPress={() => onChange(option)}>
+          <Text style={[styles.filterText, value === option && styles.filterTextActive]}>{option}</Text>
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+
+function CountryPickerModal({
+  visible,
+  countries,
+  value,
+  onClose,
+  onSelect,
+}: {
+  visible: boolean;
+  countries: Country[];
+  value?: string;
+  onClose: () => void;
+  onSelect: (country: Country) => void;
+}) {
+  if (!visible) return null;
+  return (
+    <View style={styles.overlaySoft}>
+      <Card style={styles.countryModal}>
+        <View style={styles.countryModalHeader}>
+          <View style={styles.countryModalTitleCopy}>
+            <Title>Seleccioná tu país</Title>
+            <Body muted>Elegí un país de origen desde la lista disponible.</Body>
+          </View>
+          <IconButton icon="close-outline" accessibilityLabel="Cerrar selector de países" onPress={onClose} />
+        </View>
+        <ScrollView style={styles.countryList} contentContainerStyle={styles.countryListContent} showsVerticalScrollIndicator={false}>
+          {countries.map((country) => {
+            const active = value === country.name;
+            return (
+              <Pressable key={country.id} onPress={() => onSelect(country)} style={[styles.countryRow, active && styles.countryRowActive]}>
+                <View style={styles.countryRowCopy}>
+                  <Text style={styles.countryRowTitle}>{country.name}</Text>
+                  <Body muted>{country.capital ?? 'Capital no informada'}</Body>
+                  <Body muted>{country.languages ?? 'Idioma no informado'}</Body>
+                </View>
+                <View style={styles.countryRowMeta}>
+                  <Badge label={country.code} tone={active ? 'purple' : 'dark'} />
+                  {active ? <Ionicons name="checkmark-circle" size={20} color={colors.success} /> : null}
+                </View>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+        <Button label="Cerrar" variant="ghost" onPress={onClose} />
+      </Card>
+    </View>
+  );
+}
+
+function SummaryRow({ label, value, bold }: { label: string; value: string; bold?: boolean }) {
+  return (
+    <View style={styles.summaryRow}>
+      <Body muted>{label}</Body>
+      <Text style={[styles.summaryValue, bold && styles.summaryValueBold]}>{value}</Text>
+    </View>
+  );
+}
+
+function StatusCard({ icon, title, message, tone = 'purple' }: { icon: keyof typeof Ionicons.glyphMap; title: string; message: string; tone?: 'purple' | 'green' | 'red' | 'yellow' }) {
+  return <StatusState icon={icon} title={title} message={message} tone={tone} />;
+}
 
 function GuestNotice() {
   const router = useRouter();
@@ -34,7 +108,7 @@ export function ProfileScreen() {
   if (isError || !profile) return <Screen><Header title="Perfil" /><ErrorState onRetry={() => refetch()} /></Screen>;
   return (
     <Screen>
-      <Header title="Perfil" />
+      <Header title="Perfil" right={<IconButton icon="create-outline" accessibilityLabel="Editar perfil" tone="primary" onPress={() => router.push('/profile/edit')} />} />
       <Card style={styles.profileCard}>
         <View style={styles.avatar}><Text style={styles.avatarText}>{profile.name[0]}</Text></View>
         <Title>{profile.name}</Title>
@@ -44,26 +118,33 @@ export function ProfileScreen() {
           <InfoTile icon="person-outline" label="Estado" value={accountState?.status ?? profile.status} tone={accountState?.status === 'Regular' ? 'green' : accountState?.status === 'Bloqueado' ? 'red' : 'yellow'} />
           <InfoTile icon="shield-checkmark-outline" label="Categoría" value={profile.category} />
         </View>
+        <SecurityNote text="Usamos tus datos para validar pujas, pagos y accesos de forma segura." />
       </Card>
       {accountState?.status === 'Multado' ? (
-        <Card style={styles.problemStatus}>
-          <Badge label="Multa pendiente de pago" tone="red" />
-          <Body muted>{accountState.message ?? 'Regularizá tu cuenta para volver a participar en subastas.'}</Body>
-          {accountState.penalty > 0 ? <Text style={styles.penalty}>{formatCurrency(accountState.penalty)}</Text> : null}
-          <Button label="Regularizar cuenta" onPress={() => router.push('/profile/account-status')} />
-        </Card>
+        <StatusCard icon="warning-outline" title="Multa pendiente de pago" message={accountState.message ?? 'Regularizá tu cuenta para volver a participar en subastas.'} tone="red" />
       ) : null}
-      <SectionLabel>Cuenta</SectionLabel>
-      <MenuItem icon="person-outline" label="Datos personales" onPress={() => router.push('/profile/edit')} />
-      <MenuItem icon="time-outline" label="Historial" onPress={() => router.push('/profile/history' as Href)} />
-      <MenuItem icon="stats-chart-outline" label="Métricas" onPress={() => router.push('/profile/metrics')} />
-      <MenuItem icon="cube-outline" label="Mis bienes" onPress={() => router.push('/profile/assets')} />
-      <MenuItem icon="bag-check-outline" label="Mis compras" onPress={() => router.push('/purchases')} />
-      <SectionLabel>Estado operativo y legal</SectionLabel>
-      <MenuItem icon="card-outline" label="Medios de pago" onPress={() => router.push('/profile/payments')} />
-      <MenuItem icon="warning-outline" label="Multas" onPress={() => router.push('/profile/account-status')} />
-      <SectionLabel>Gestión financiera</SectionLabel>
-      <MenuItem icon="shield-checkmark-outline" label="Seguros y Pólizas" onPress={() => router.push('/profile/policies' as Href)} />
+      <Card style={styles.menuBlock}>
+        <SectionHeader title="Cuenta" subtitle="Accedé a tu información y actividad" />
+        <MenuItem icon="person-outline" label="Datos personales" onPress={() => router.push('/profile/edit')} />
+        <Divider />
+        <MenuItem icon="time-outline" label="Historial" onPress={() => router.push('/profile/history' as Href)} />
+        <Divider />
+        <MenuItem icon="stats-chart-outline" label="Métricas" onPress={() => router.push('/profile/metrics')} />
+        <Divider />
+        <MenuItem icon="cube-outline" label="Mis bienes" onPress={() => router.push('/profile/assets')} />
+        <Divider />
+        <MenuItem icon="bag-check-outline" label="Mis compras" onPress={() => router.push('/purchases')} />
+      </Card>
+      <Card style={styles.menuBlock}>
+        <SectionHeader title="Estado operativo y legal" subtitle="Validaciones para pujas y pagos" />
+        <MenuItem icon="card-outline" label="Medios de pago" onPress={() => router.push('/profile/payments')} />
+        <Divider />
+        <MenuItem icon="warning-outline" label="Multas" onPress={() => router.push('/profile/account-status')} />
+      </Card>
+      <Card style={styles.menuBlock}>
+        <SectionHeader title="Gestión financiera" subtitle="Coberturas y respaldo de tus compras" />
+        <MenuItem icon="shield-checkmark-outline" label="Seguros y Pólizas" onPress={() => router.push('/profile/policies' as Href)} />
+      </Card>
       <Button label="Cerrar sesión" variant="ghost" onPress={async () => {
         try { await authService.logout(); } finally { await signOut(); router.replace('/welcome'); }
       }} />
@@ -76,13 +157,13 @@ function MenuItem({ icon, label, onPress }: { icon: keyof typeof Ionicons.glyphM
 }
 
 export function MetricsScreen() {
-  const router = useRouter();
+  const back = useSafeBack();
   const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['metrics'], queryFn: profileService.metrics });
   if (isLoading) return <Screen><LoadingState /></Screen>;
-  if (isError || !data) return <Screen><Header title="Métricas" onBack={() => router.back()} /><ErrorState onRetry={() => refetch()} /></Screen>;
+  if (isError || !data) return <Screen><Header title="Métricas" onBack={back} /><ErrorState onRetry={() => refetch()} /></Screen>;
   return (
     <Screen>
-      <Header title="Métricas" onBack={() => router.back()} />
+      <Header title="Métricas" onBack={back} />
       <View style={styles.metricGrid}>
         <InfoTile icon="hammer-outline" label="Participadas" value={String(data.participated)} />
         <InfoTile icon="trophy-outline" label="Ganadas" value={String(data.won)} tone="green" />
@@ -102,33 +183,30 @@ export function MetricsScreen() {
 
 export function ParticipationHistoryScreen() {
   const router = useRouter();
+  const back = useSafeBack();
   const [filter, setFilter] = useState<'Todas' | 'Ganadas' | 'Perdidas'>('Todas');
   const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['purchases', 'participation-history'], queryFn: purchaseService.list });
   const visiblePurchases = filter === 'Perdidas' ? [] : data ?? [];
   return (
     <Screen>
-      <Header title="Historial de participaciones" onBack={() => router.back()} />
-      <View style={styles.filters}>
-        {(['Todas', 'Ganadas', 'Perdidas'] as const).map((item) => (
-          <Pressable key={item} style={[styles.filter, filter === item && styles.filterActive]} onPress={() => setFilter(item)}>
-            <Text style={[styles.filterText, filter === item && styles.filterTextActive]}>{item}</Text>
-          </Pressable>
-        ))}
-      </View>
+      <Header title="Historial de participaciones" onBack={back} />
+      <FilterTabs options={['Todas', 'Ganadas', 'Perdidas'] as const} value={filter} onChange={setFilter} />
       {filter === 'Todas' ? <Card style={styles.policy}>
         <Body muted>Por ahora se muestran participaciones ganadas asociadas a tus compras. Las demás estarán disponibles cuando la API exponga el historial completo.</Body>
       </Card> : filter === 'Perdidas' ? <Card style={styles.policy}>
         <Body muted>Las participaciones no ganadas estarán disponibles cuando la API exponga su historial.</Body>
       </Card> : null}
       {isLoading ? <LoadingState /> : isError ? <ErrorState onRetry={() => refetch()} /> : visiblePurchases.length ? visiblePurchases.map((purchase) => (
-        <Card key={purchase.id}>
-          <View style={styles.between}>
-            <Title>{purchase.lot.title}</Title>
+        <Card key={purchase.id} style={styles.itemCard}>
+          <View style={styles.cardHeaderRow}>
+            <View style={styles.cardHeaderCopy}>
+              <Text style={styles.cardTitle}>{purchase.lot.title}</Text>
+              <Body muted>{purchase.auctionName ?? 'Subasta'}</Body>
+            </View>
             <Badge label="Ganada" tone="green" />
           </View>
-          <Body muted>{purchase.auctionName ?? 'Subasta'}</Body>
-          <SummaryLine label="Monto final" value={formatCurrency(purchase.amount)} />
-          {purchase.date ? <SummaryLine label="Fecha" value={purchase.date} /> : null}
+          <SummaryRow label="Monto final" value={formatCurrency(purchase.amount)} bold />
+          {purchase.date ? <SummaryRow label="Fecha" value={purchase.date} /> : null}
           <Button label="Ver compra" variant="secondary" onPress={() => router.push(`/purchases/${purchase.id}`)} />
         </Card>
       )) : <EmptyState title="Todavía no hay participaciones registradas" message="Cuando participes en subastas, verás tu historial acá." />}
@@ -138,9 +216,10 @@ export function ParticipationHistoryScreen() {
 
 export function AccountStatusScreen() {
   const router = useRouter();
+  const back = useSafeBack();
   const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['account-state'], queryFn: profileService.accountState });
   if (isLoading) return <Screen><LoadingState /></Screen>;
-  if (isError || !data) return <Screen><Header title="Estado de cuenta" onBack={() => router.back()} /><ErrorState onRetry={() => refetch()} /></Screen>;
+  if (isError || !data) return <Screen><Header title="Estado de cuenta" onBack={back} /><ErrorState onRetry={() => refetch()} /></Screen>;
   const regular = data.status === 'Regular';
   const blocked = data.status === 'Bloqueado';
   const title = regular ? 'Estado de cuenta regular' : blocked ? 'Cuenta bloqueada' : 'Cuenta multada';
@@ -151,9 +230,9 @@ export function AccountStatusScreen() {
       : 'Tenés multas pendientes. Debés regularizarlas antes de participar en otra subasta.';
   return (
     <Screen>
-      <Header title="Estado de cuenta" onBack={() => router.back()} />
-      <StatusPanel icon={regular ? 'checkmark-circle-outline' : blocked ? 'lock-closed-outline' : 'alert-circle-outline'} title={title} message={data.message ? `${description} ${data.message}` : description} tone={regular ? 'green' : 'red'} />
-      {data.penalty > 0 ? <Text style={styles.penalty}>{formatCurrency(data.penalty)}</Text> : null}
+      <Header title="Estado de cuenta" onBack={back} />
+      <StatusCard icon={regular ? 'checkmark-circle-outline' : blocked ? 'lock-closed-outline' : 'alert-circle-outline'} title={title} message={data.message ? `${description} ${data.message}` : description} tone={regular ? 'green' : 'red'} />
+      {data.penalty > 0 ? <Card style={styles.penaltyCard}><Body muted>Importe pendiente</Body><Text style={styles.penalty}>{formatCurrency(data.penalty)}</Text></Card> : null}
       {!regular ? <Button label="Ver compras pendientes" onPress={() => router.push('/purchases')} /> : null}
     </Screen>
   );
@@ -161,6 +240,7 @@ export function AccountStatusScreen() {
 
 export function PaymentsScreen() {
   const router = useRouter();
+  const back = useSafeBack();
   const queryClient = useQueryClient();
   const [selectedForRemoval, setSelectedForRemoval] = useState<string>();
   const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['payments'], queryFn: paymentService.list });
@@ -173,14 +253,17 @@ export function PaymentsScreen() {
   });
   return (
     <Screen>
-      <Header title="Medios de pago" onBack={() => router.back()} />
+      <Header title="Medios de pago" onBack={back} />
       {isLoading ? <LoadingState /> : isError ? <ErrorState onRetry={() => refetch()} /> : data?.length ? data.map((payment) => (
-        <View key={payment.id} style={styles.paymentRow}>
+        <Card key={payment.id} style={styles.itemCard}>
           <PaymentMethodCard payment={payment} selected={payment.verified} />
-          <Button label="Eliminar" variant="ghost" onPress={() => setSelectedForRemoval(payment.id)} />
-        </View>
+          <Divider />
+          <View style={styles.cardActionsRow}>
+            <Button label="Eliminar" variant="ghost" onPress={() => setSelectedForRemoval(payment.id)} />
+          </View>
+        </Card>
       )) : <EmptyState title="Sin medios de pago" message="Agregá uno para participar de una puja." />}
-      <SectionLabel>Agregar medio</SectionLabel>
+      <SectionHeader title="Agregar medio" subtitle="Elegí el tipo de validación que necesites" />
       <ActionRow icon="card-outline" label="Tarjeta de crédito" description="Alta rápida para pagos y pujas." onPress={() => router.push({ pathname: '/profile/payments/add', params: { type: 'tarjeta_credito' } })} />
       <ActionRow icon="business-outline" label="Cuenta bancaria" description="Reservá fondos para operar." onPress={() => router.push({ pathname: '/profile/payments/add', params: { type: 'cuenta_bancaria' } })} />
       <ActionRow icon="wallet-outline" label="Cheque certificado" description="Requiere documentación para revisión." onPress={() => router.push({ pathname: '/profile/payments/add', params: { type: 'cheque_certificado' } })} />
@@ -199,26 +282,24 @@ export function PaymentsScreen() {
 
 export function AssetsScreen() {
   const router = useRouter();
+  const back = useSafeBack();
   const [status, setStatus] = useState('Todos');
   const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['assets', status], queryFn: () => assetService.list(status) });
   return (
     <Screen>
-      <Header title="Mis bienes" onBack={() => router.back()} />
-      <SectionLabel>Estado de solicitud</SectionLabel>
-      <View style={styles.filters}>
-        {['Todos', 'Pendiente', 'Aceptado', 'Rechazado'].map((item) => (
-          <Pressable key={item} style={[styles.filter, status === item && styles.filterActive]} onPress={() => setStatus(item)}>
-            <Text style={[styles.filterText, status === item && styles.filterTextActive]}>{item}</Text>
-          </Pressable>
-        ))}
-      </View>
+      <Header title="Mis bienes" onBack={back} />
+      <SectionHeader title="Estado de solicitud" subtitle="Filtrá tus bienes por su revisión actual" />
+      <FilterTabs options={['Todos', 'Pendiente', 'Aceptado', 'Rechazado'] as const} value={status} onChange={setStatus} />
       {isLoading ? <LoadingState /> : isError ? <ErrorState onRetry={() => refetch()} /> : data?.length ? data.map((asset) => (
-        <Card key={asset.id}>
-          <View style={styles.between}>
-            <Text style={styles.cardTitle}>{asset.title}</Text>
+        <Card key={asset.id} style={styles.itemCard}>
+          <View style={styles.cardHeaderRow}>
+            <View style={styles.cardHeaderCopy}>
+              <Text style={styles.cardTitle}>{asset.title}</Text>
+              <Body muted>{asset.category}</Body>
+            </View>
             <Badge label={asset.status} tone={asset.status === 'Aceptado' ? 'green' : asset.status === 'Rechazado' ? 'red' : 'yellow'} />
           </View>
-          <Body muted>{asset.category} - {asset.detail}</Body>
+          <Body muted>{asset.detail}</Body>
           <Button label="Ver detalle" variant="secondary" onPress={() => router.push({ pathname: '/profile/assets/[id]', params: { id: asset.id } })} />
         </Card>
       )) : <EmptyState title="Sin bienes en este estado" message="Tus solicitudes aparecerán acá al ser registradas." />}
@@ -229,6 +310,7 @@ export function AssetsScreen() {
 
 export function PurchasesScreen() {
   const router = useRouter();
+  const back = useSafeBack();
   const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['purchases'], queryFn: purchaseService.list });
   const sections = data ? [
     { label: 'Pendientes', items: data.filter((purchase) => purchase.paymentStatus.toLowerCase() !== 'pagado') },
@@ -237,10 +319,10 @@ export function PurchasesScreen() {
   ] : [];
   return (
     <Screen>
-      <Header title="Mis compras" onBack={() => router.back()} />
+      <Header title="Mis compras" onBack={back} />
       {isLoading ? <LoadingState /> : isError ? <ErrorState onRetry={() => refetch()} /> : data?.length ? sections.map((section) => section.items.length ? (
         <View key={section.label} style={styles.purchaseSection}>
-          <SectionLabel>{section.label}</SectionLabel>
+          <SectionHeader title={section.label} subtitle="Agrupadas por estado de pago y entrega" />
           {section.items.map((purchase) => (
             <PurchaseCard key={purchase.id} purchase={purchase} onPress={() => router.push(`/purchases/${purchase.id}`)} />
           ))}
@@ -252,15 +334,16 @@ export function PurchasesScreen() {
 
 export function PoliciesScreen() {
   const router = useRouter();
+  const back = useSafeBack();
   const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['purchases', 'policies'], queryFn: purchaseService.list });
   const insuredPurchases = (data ?? []).filter((purchase) => !!purchase.insuranceId)
     .filter((purchase, index, purchases) => purchases.findIndex((item) => item.insuranceId === purchase.insuranceId) === index);
   return (
     <Screen>
-      <Header title="Seguros y Pólizas" onBack={() => router.back()} />
-      <StatusPanel icon="shield-checkmark-outline" title="Cobertura de bienes" message="Tus pólizas asociadas a compras aparecerán acá cuando el backend informe el vínculo." />
+      <Header title="Seguros y Pólizas" onBack={back} />
+      <StatusCard icon="shield-checkmark-outline" title="Cobertura de bienes" message="Tus pólizas asociadas a compras aparecerán acá cuando el backend informe el vínculo." tone="green" />
       {isLoading ? <LoadingState /> : isError ? <ErrorState onRetry={() => refetch()} /> : insuredPurchases.length ? insuredPurchases.map((purchase) => (
-        <Card key={purchase.insuranceId}>
+        <Card key={purchase.insuranceId} style={styles.itemCard}>
           <Badge label="Póliza activa" tone="green" />
           <Title>{purchase.lot.title}</Title>
           <Body muted>{purchase.auctionName ?? 'Compra asegurada'}</Body>
@@ -273,26 +356,33 @@ export function PoliciesScreen() {
 
 export function PurchaseDetailScreen() {
   const router = useRouter();
+  const back = useSafeBack();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['purchase', id], queryFn: () => purchaseService.get(id ?? '') });
   if (isLoading) return <Screen><LoadingState /></Screen>;
-  if (isError || !data) return <Screen><Header title="Detalle de compra" onBack={() => router.back()} /><ErrorState onRetry={() => refetch()} /></Screen>;
+  if (isError || !data) return <Screen><Header title="Detalle de compra" onBack={back} /><ErrorState onRetry={() => refetch()} /></Screen>;
   return (
     <Screen>
-      <Header title="Detalle de compra" onBack={() => router.back()} />
-      <Card>
-        <Title>{data.lot.title}</Title>
-        <Body muted>{data.auctionName}</Body>
+      <Header title="Detalle de compra" onBack={back} />
+      <Card style={styles.itemCard}>
+        <View style={styles.cardHeaderRow}>
+          <View style={styles.cardHeaderCopy}>
+            <Title>{data.lot.title}</Title>
+            <Body muted>{data.auctionName}</Body>
+          </View>
+          <Badge label={data.paymentStatus} tone={data.paymentStatus.toLowerCase() === 'pagado' ? 'green' : 'yellow'} />
+        </View>
         <View style={styles.tileRow}>
           <InfoTile icon="card-outline" label="Pago" value={data.paymentStatus} tone={data.paymentStatus.toLowerCase() === 'pagado' ? 'green' : 'yellow'} />
           <InfoTile icon="cube-outline" label="Entrega" value={data.deliveryStatus} />
         </View>
-        <SummaryLine label="Valor pujado" value={formatCurrency(data.amount)} />
-        <SummaryLine label="Cargos y comisión" value={formatCurrency(data.fee)} />
-        {data.shippingCost != null ? <SummaryLine label="Envío" value={formatCurrency(data.shippingCost)} /> : null}
-        <SummaryLine label="Total" value={formatCurrency(data.total ?? data.amount + data.fee)} bold />
+        <Divider />
+        <SummaryRow label="Valor pujado" value={formatCurrency(data.amount)} />
+        <SummaryRow label="Cargos y comisión" value={formatCurrency(data.fee)} />
+        {data.shippingCost != null ? <SummaryRow label="Envío" value={formatCurrency(data.shippingCost)} /> : null}
+        <SummaryRow label="Total" value={formatCurrency(data.total ?? data.amount + data.fee)} bold />
       </Card>
-      <Card>
+      <Card style={styles.itemCard}>
         <Badge label={data.deliveryStatus} tone="green" />
         <Title>Coordinación de entrega</Title>
         <Body muted>{data.deliveryAddress ?? 'La dirección de entrega se informará cuando esté coordinada.'}</Body>
@@ -314,12 +404,9 @@ export function PurchaseDetailScreen() {
   );
 }
 
-function SummaryLine({ label, value, bold }: { label: string; value: string; bold?: boolean }) {
-  return <View style={styles.between}><Body muted>{label}</Body><Text style={[styles.value, bold && styles.valueBold]}>{value}</Text></View>;
-}
-
 export function PurchasePaymentScreen() {
   const router = useRouter();
+  const back = useSafeBack();
   const queryClient = useQueryClient();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [paymentId, setPaymentId] = useState('');
@@ -334,16 +421,16 @@ export function PurchasePaymentScreen() {
     },
   });
   if (loadingPurchase || loadingPayments) return <Screen><LoadingState /></Screen>;
-  if (purchaseError || paymentsError || !purchase) return <Screen><Header title="Regularizar pago" onBack={() => router.back()} /><ErrorState /></Screen>;
+  if (purchaseError || paymentsError || !purchase) return <Screen><Header title="Regularizar pago" onBack={back} /><ErrorState /></Screen>;
   return (
     <Screen>
-      <Header title="Regularizar pago" onBack={() => router.back()} />
-      <Card>
+      <Header title="Regularizar pago" onBack={back} />
+      <Card style={styles.itemCard}>
         <Title>{purchase.lot.title}</Title>
-        <SummaryLine label="Monto a regularizar" value={formatCurrency(purchase.total ?? purchase.amount + purchase.fee)} bold />
+        <SummaryRow label="Monto a regularizar" value={formatCurrency(purchase.total ?? purchase.amount + purchase.fee)} bold />
         <Body muted>Seleccioná un medio verificado para confirmar el pago pendiente.</Body>
       </Card>
-      <SectionLabel>Medios verificados</SectionLabel>
+      <SectionHeader title="Medios verificados" subtitle="Usá un medio aprobado para completar el pago" />
       {usablePayments.length ? usablePayments.map((payment) => (
         <Pressable key={payment.id} onPress={() => setPaymentId(payment.id)}>
           <PaymentMethodCard payment={payment} selected={paymentId === payment.id} />
@@ -360,10 +447,11 @@ export function PurchasePaymentScreen() {
 
 export function DeliveryScreen() {
   const router = useRouter();
+  const back = useSafeBack();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['purchase', id], queryFn: () => purchaseService.get(id ?? '') });
   if (isLoading) return <Screen><LoadingState /></Screen>;
-  if (isError || !data) return <Screen><Header title="Entrega" onBack={() => router.back()} /><ErrorState onRetry={() => refetch()} /></Screen>;
+  if (isError || !data) return <Screen><Header title="Entrega" onBack={back} /><ErrorState onRetry={() => refetch()} /></Screen>;
   const status = data.deliveryStatus.toLowerCase();
   const ready = status === 'listo_para_retirar';
   const moving = status === 'en_camino';
@@ -378,44 +466,35 @@ export function DeliveryScreen() {
         : data.deliveryAddress ?? 'Estamos coordinando la dirección y modalidad de entrega.';
   return (
     <Screen>
-      <Header title="Entrega" onBack={() => router.back()} />
-      <Card style={data.insuranceId ? styles.policy : undefined}>
-        <Ionicons name={ready ? 'location-outline' : moving ? 'car-outline' : delivered ? 'checkmark-circle-outline' : 'time-outline'} size={38} color={colors.primary} />
-        <Badge label={data.deliveryStatus} tone={delivered || ready ? 'green' : 'purple'} />
-        <Title>{title}</Title>
-        <Body muted>{text}</Body>
-      </Card>
+      <Header title="Entrega" onBack={back} />
+      <StatusCard icon={ready ? 'location-outline' : moving ? 'car-outline' : delivered ? 'checkmark-circle-outline' : 'time-outline'} title={title} message={text} tone={delivered || ready ? 'green' : 'purple'} />
       {data.insuranceId ? (
-        <Card style={styles.policy}>
+        <Card style={styles.itemCard}>
           <Badge label="Envío cubierto" tone="green" />
           <Body muted>La cobertura asociada al lote acompaña esta entrega.</Body>
           <Button label="Ver póliza" variant="secondary" onPress={() => router.push(`/policy/${data.insuranceId}`)} />
         </Card>
       ) : null}
       <Button label="Coordinar por Chat" variant="secondary" icon="chatbubble-ellipses-outline" onPress={() => router.push('/chat/soporte')} />
-      <Button label="Volver al detalle" onPress={() => router.back()} />
+      <Button label="Volver al detalle" onPress={back} />
     </Screen>
   );
 }
 
 export function InvoiceScreen() {
-  const router = useRouter();
+  const back = useSafeBack();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['invoice-content', id],
     queryFn: () => purchaseService.invoiceContent(id ?? ''),
   });
   if (isLoading) return <Screen><LoadingState /></Screen>;
-  if (isError || !data) return <Screen><Header title="Factura" onBack={() => router.back()} /><ErrorState onRetry={() => refetch()} /></Screen>;
+  if (isError || !data) return <Screen><Header title="Factura" onBack={back} /><ErrorState onRetry={() => refetch()} /></Screen>;
   return (
     <Screen>
-      <Header title="Factura" onBack={() => router.back()} />
-      <Card style={styles.policy}>
-        <Ionicons name="document-text-outline" size={36} color={colors.primary} />
-        <Title>Comprobante de compra</Title>
-        <Body muted>Factura emitida por SubastAR</Body>
-      </Card>
-      <Card>
+      <Header title="Factura" onBack={back} />
+      <StatusCard icon="document-text-outline" title="Comprobante de compra" message="Factura emitida por SubastAR" tone="purple" />
+      <Card style={styles.itemCard}>
         <Text style={styles.invoiceText}>{data}</Text>
       </Card>
     </Screen>
@@ -424,29 +503,30 @@ export function InvoiceScreen() {
 
 export function PolicyScreen() {
   const router = useRouter();
+  const back = useSafeBack();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['policy', id], queryFn: () => insuranceService.get(id ?? '') });
   if (isLoading) return <Screen><LoadingState /></Screen>;
-  if (isError || !data) return <Screen><Header title="Póliza de seguro" onBack={() => router.back()} /><ErrorState onRetry={() => refetch()} /></Screen>;
+  if (isError || !data) return <Screen><Header title="Póliza de seguro" onBack={back} /><ErrorState onRetry={() => refetch()} /></Screen>;
   return (
     <Screen>
-      <Header title="Póliza de seguro" onBack={() => router.back()} />
-      <Card style={styles.policy}>
-        <Ionicons name="shield-checkmark-outline" size={36} color={colors.primary} />
+      <Header title="Póliza de seguro" onBack={back} />
+      <StatusCard icon="shield-checkmark-outline" title={data.company} message={`Póliza ${data.number} - Vigente hasta ${data.validUntil ?? 'sin fecha informada'}`} tone="green" />
+      <Card style={styles.itemCard}>
         <Title>{data.company}</Title>
-        <Body muted>Póliza {data.number} - Vigente hasta {data.validUntil ?? 'sin fecha informada'}</Body>
         <View style={styles.tileRow}>
           <InfoTile icon="cash-outline" label="Valor asegurado" value={formatCurrency(data.insuredValue)} />
           <InfoTile icon="checkmark-circle-outline" label="Estado" value="Activa" tone="green" />
         </View>
-        <SummaryLine label="Valor asegurado" value={formatCurrency(data.insuredValue)} bold />
-        <SummaryLine label="Cobertura" value={data.coverage ?? 'Sin detalle'} />
+        <Divider />
+        <SummaryRow label="Valor asegurado" value={formatCurrency(data.insuredValue)} bold />
+        <SummaryRow label="Cobertura" value={data.coverage ?? 'Sin detalle'} />
       </Card>
-      <Card>
+      <Card style={styles.itemCard}>
         <Text style={styles.cardTitle}>Piezas cubiertas</Text>
         {data.items.length ? data.items.map((item) => <Body key={item} muted>{item}</Body>) : <Body muted>No hay detalle de piezas informado.</Body>}
       </Card>
-      <Card>
+      <Card style={styles.itemCard}>
         <Text style={styles.cardTitle}>Contacto aseguradora</Text>
         <Body muted>{data.contact?.phone ?? 'Teléfono no informado'}</Body>
         <Body muted>{data.contact?.email ?? 'Correo no informado'}</Body>
@@ -459,6 +539,7 @@ export function PolicyScreen() {
 
 export function ExtendPolicyScreen() {
   const router = useRouter();
+  const back = useSafeBack();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [newValue, setNewValue] = useState('');
   const queryClient = useQueryClient();
@@ -468,43 +549,39 @@ export function ExtendPolicyScreen() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['policy', id] }),
   });
   if (isLoading) return <Screen><LoadingState /></Screen>;
-  if (isError || !data) return <Screen><Header title="Ampliar póliza" onBack={() => router.back()} /><ErrorState onRetry={() => refetch()} /></Screen>;
+  if (isError || !data) return <Screen><Header title="Ampliar póliza" onBack={back} /><ErrorState onRetry={() => refetch()} /></Screen>;
   return (
     <Screen>
-      <Header title="Ampliar póliza" onBack={() => router.back()} />
-      <Card style={styles.policy}>
+      <Header title="Ampliar póliza" onBack={back} />
+      <Card style={styles.itemCard}>
         <Title>Solicitar mayor cobertura</Title>
-        <SummaryLine label="Cobertura actual" value={formatCurrency(data.insuredValue)} bold />
+        <SummaryRow label="Cobertura actual" value={formatCurrency(data.insuredValue)} bold />
         <Body muted>Ingresá un valor superior al actual para solicitar la ampliación.</Body>
       </Card>
       <Input label="Nuevo valor asegurado" keyboardType="number-pad" value={newValue} onChangeText={setNewValue} />
       <Button label={extend.isPending ? 'Solicitando...' : 'Confirmar solicitud'} disabled={!newValue || Number(newValue) <= data.insuredValue || extend.isPending} onPress={() => extend.mutate()} />
-      {extend.isSuccess ? <Card style={styles.okStatus}><Badge label="Solicitud registrada" tone="green" /><Body muted>La nueva cobertura fue actualizada correctamente.</Body></Card> : null}
+      {extend.isSuccess ? <StatusCard icon="checkmark-circle-outline" title="Solicitud registrada" message="La nueva cobertura fue actualizada correctamente." tone="green" /> : null}
       {extend.isError ? <Body muted>{extend.error instanceof Error ? extend.error.message : 'No fue posible ampliar la cobertura.'}</Body> : null}
     </Screen>
   );
 }
 
 export function PolicyContactScreen() {
-  const router = useRouter();
+  const back = useSafeBack();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['policy', id], queryFn: () => insuranceService.get(id ?? '') });
   if (isLoading) return <Screen><LoadingState /></Screen>;
-  if (isError || !data) return <Screen><Header title="Contacto compañía" onBack={() => router.back()} /><ErrorState onRetry={() => refetch()} /></Screen>;
+  if (isError || !data) return <Screen><Header title="Contacto compañía" onBack={back} /><ErrorState onRetry={() => refetch()} /></Screen>;
   return (
     <Screen>
-      <Header title="Contacto compañía" onBack={() => router.back()} />
-      <Card style={styles.policy}>
-        <Ionicons name="shield-checkmark-outline" size={36} color={colors.primary} />
-        <Title>{data.company}</Title>
-        <Body muted>Póliza {data.number}</Body>
+      <Header title="Contacto compañía" onBack={back} />
+      <StatusCard icon="shield-checkmark-outline" title={data.company} message={`Póliza ${data.number}`} tone="green" />
+      <Card style={styles.itemCard}>
+        <SummaryRow label="Teléfono" value={data.contact?.phone ?? 'No informado'} />
+        <SummaryRow label="Correo" value={data.contact?.email ?? 'No informado'} />
+        <SummaryRow label="Web" value={data.contact?.web ?? 'No informada'} />
       </Card>
-      <Card>
-        <SummaryLine label="Teléfono" value={data.contact?.phone ?? 'No informado'} />
-        <SummaryLine label="Correo" value={data.contact?.email ?? 'No informado'} />
-        <SummaryLine label="Web" value={data.contact?.web ?? 'No informada'} />
-      </Card>
-      <Button label="Volver a la póliza" onPress={() => router.back()} />
+      <Button label="Volver a la póliza" onPress={back} />
     </Screen>
   );
 }
@@ -518,15 +595,15 @@ export function ChatsScreen() {
       <Header title="Chats" />
       {!session ? <GuestNotice /> : isLoading ? <LoadingState /> : isError ? <ErrorState onRetry={() => refetch()} /> : data?.length ? data.map((chat) => (
         <Pressable key={chat.id} onPress={() => router.push(`/chat/${chat.id}`)}>
-        <Card style={styles.chatRow}>
-          <View style={styles.chatIcon}><Ionicons name="chatbubble-outline" size={20} color={colors.primary} /></View>
-          <View style={styles.flex}>
-            <Text style={styles.cardTitle}>{chat.name}</Text>
-            <Body muted>{chat.lastMessage}</Body>
-          </View>
-          {chat.unread ? <Badge label={String(chat.unread)} /> : null}
-          <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-        </Card>
+          <Card style={styles.chatRow}>
+            <View style={styles.chatIcon}><Ionicons name="chatbubble-outline" size={20} color={colors.primary} /></View>
+            <View style={styles.flex}>
+              <Text style={styles.cardTitle}>{chat.name}</Text>
+              <Body muted>{chat.lastMessage}</Body>
+            </View>
+            {chat.unread ? <Badge label={String(chat.unread)} /> : null}
+            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+          </Card>
         </Pressable>
       )) : <EmptyState title="Sin conversaciones" message="Tus consultas y notificaciones aparecerán acá." />}
     </Screen>
@@ -534,7 +611,7 @@ export function ChatsScreen() {
 }
 
 export function ConversationScreen() {
-  const router = useRouter();
+  const back = useSafeBack();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['messages', id], queryFn: () => chatService.messages(id ?? 'bot') });
   const queryClient = useQueryClient();
@@ -546,8 +623,8 @@ export function ConversationScreen() {
   const title = id === 'soporte' ? 'Soporte SubastAR' : id === 'poliza' ? 'Póliza de seguro' : 'Asistente SubastAR';
   return (
     <Screen>
-      <Header title={title} onBack={() => router.back()} />
-      <StatusPanel icon="chatbubble-ellipses-outline" title="Canal de consulta" message="Usá este espacio para coordinar soporte, entregas o consultas de póliza." />
+      <Header title={title} onBack={back} />
+      <StatusCard icon="chatbubble-ellipses-outline" title="Canal de consulta" message="Usá este espacio para coordinar soporte, entregas o consultas de póliza." tone="purple" />
       {isLoading ? <LoadingState /> : isError ? <ErrorState onRetry={() => refetch()} /> : data?.map((message) => (
         <View key={message.id} style={[styles.bubble, message.author === 'user' && styles.userBubble]}>
           <Text style={[styles.message, message.author === 'user' && styles.userMessage]}>{message.text}</Text>
@@ -565,25 +642,47 @@ export function ConversationScreen() {
 
 export function EditProfileScreen() {
   const router = useRouter();
+  const back = useSafeBack();
   const queryClient = useQueryClient();
   const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['profile'], queryFn: profileService.me });
+  const { data: countries = [], isLoading: loadingCountries, isError: countriesError } = useQuery({ queryKey: ['countries'], queryFn: profileService.countries });
   const [address, setAddress] = useState('');
   const [country, setCountry] = useState('');
+  const [countryPickerVisible, setCountryPickerVisible] = useState(false);
   const save = useMutation({
     mutationFn: () => profileService.update({ address: address || data?.address, country: country || data?.country }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['profile'] }); router.back(); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['profile'] }); router.replace('/profile'); },
   });
+  const selectedCountry = useMemo(() => countries.find((item) => item.name === (country || data?.country)), [countries, country, data?.country]);
   if (isLoading) return <Screen><LoadingState /></Screen>;
-  if (isError || !data) return <Screen><Header title="Datos personales" onBack={() => router.back()} /><ErrorState onRetry={() => refetch()} /></Screen>;
+  if (isError || !data) return <Screen><Header title="Datos personales" onBack={back} /><ErrorState onRetry={() => refetch()} /></Screen>;
   return (
     <Screen>
-      <Header title="Datos personales" onBack={() => router.back()} />
-      <Input label="Nombre y apellido" value={data.name} editable={false} />
-      <Input label="Email" value={data.email} editable={false} />
-      <Input label="DNI" value={data.dni ?? ''} editable={false} />
-      <Input label="Categoría" value={data.category ?? ''} editable={false} />
+      <Header title="Datos personales" onBack={back} />
+      <Card style={styles.itemCard}>
+        <Input label="Nombre y apellido" value={data.name} editable={false} />
+        <Input label="Email" value={data.email} editable={false} />
+        <Input label="DNI" value={data.dni ?? ''} editable={false} />
+        <Input label="Categoría" value={data.category ?? ''} editable={false} />
+      </Card>
       <Input label="Dirección" value={address || (data.address ?? '')} onChangeText={setAddress} />
-      <Input label="País de origen" value={country || (data.country ?? '')} onChangeText={setCountry} />
+      <SelectInput
+        label="País de origen"
+        value={selectedCountry ? `${selectedCountry.name} (${selectedCountry.code})` : country || data.country}
+        placeholder={loadingCountries ? 'Cargando países...' : 'Seleccionar país'}
+        helperText={countriesError ? 'No se pudieron cargar los países. Podés reintentar más tarde.' : 'Mostramos el listado recibido desde /api/v1/paises.'}
+        onPress={() => setCountryPickerVisible(true)}
+      />
+      <CountryPickerModal
+        visible={countryPickerVisible}
+        countries={countries}
+        value={country || data.country}
+        onClose={() => setCountryPickerVisible(false)}
+        onSelect={(selected) => {
+          setCountry(selected.name);
+          setCountryPickerVisible(false);
+        }}
+      />
       <Button label={save.isPending ? 'Guardando...' : 'Guardar cambios'} disabled={save.isPending} onPress={() => save.mutate()} />
       {save.isError ? <Body muted>{save.error instanceof Error ? save.error.message : 'No fue posible guardar.'}</Body> : null}
     </Screen>
@@ -592,6 +691,7 @@ export function EditProfileScreen() {
 
 export function PaymentAddScreen() {
   const router = useRouter();
+  const back = useSafeBack();
   const queryClient = useQueryClient();
   const { type, onboarding, returnTo } = useLocalSearchParams<{ type?: PaymentMethodKind; onboarding?: string; returnTo?: string }>();
   const kind = type ?? 'tarjeta_credito';
@@ -632,9 +732,13 @@ export function PaymentAddScreen() {
       : !!bank && !!identifier && Number(amount) > 0 && !!photo;
   return (
     <Screen>
-      <Header title={label} onBack={() => router.back()} />
-      <Title>Agregar {label.toLowerCase()}</Title>
-      <StatusPanel icon="lock-closed-outline" title="Validación del medio" message="La empresa puede revisar los datos antes de habilitarlo para pujas y pagos pendientes." />
+      <Header title={label} onBack={back} />
+      <Card style={styles.itemCard}>
+        <Badge label="Alta de medio" tone="purple" />
+        <Title>Agregar {label.toLowerCase()}</Title>
+        <Body muted>La empresa puede revisar los datos antes de habilitarlo para pujas y pagos pendientes.</Body>
+      </Card>
+      <StatusCard icon="lock-closed-outline" title="Validación del medio" message="La empresa puede revisar los datos antes de habilitarlo para pujas y pagos pendientes." tone="yellow" />
       {onboarding === 'true' ? <Button label="Omitir por ahora" variant="ghost" onPress={() => router.replace((returnTo || '/(tabs)') as Href)} /> : null}
       {kind !== 'tarjeta_credito' ? <Input label="Nombre del banco" value={bank} onChangeText={setBank} /> : null}
       {kind === 'cuenta_bancaria' ? <Input label="País del banco" value={country} onChangeText={setCountry} /> : null}
@@ -664,9 +768,7 @@ export function PaymentSuccessScreen() {
   const chequePending = type === 'cheque_certificado';
   return (
     <Screen style={styles.successScreen}>
-      <Ionicons name={chequePending ? 'time-outline' : 'checkmark-circle-outline'} size={58} color={chequePending ? colors.primary : colors.success} />
-      <Title>{chequePending ? 'Cheque enviado a revisión' : '¡Se agregó el medio de pago exitosamente!'}</Title>
-      <Body muted>{chequePending ? 'Validaremos la documentación. El cheque se habilitará para pujas cuando sea aprobado.' : 'Ya podés utilizarlo para participar en las subastas disponibles.'}</Body>
+      <StatusCard icon={chequePending ? 'time-outline' : 'checkmark-circle-outline'} title={chequePending ? 'Cheque enviado a revisión' : '¡Se agregó el medio de pago exitosamente!'} message={chequePending ? 'Validaremos la documentación. El cheque se habilitará para pujas cuando sea aprobado.' : 'Ya podés utilizarlo para participar en las subastas disponibles.'} tone={chequePending ? 'yellow' : 'green'} />
       <Button
         label="Agregar otro medio de pago"
         onPress={() => router.replace(onboarding === 'true' ? { pathname: '/onboarding-payment', params: { returnTo } } : '/profile/payments')}
@@ -678,6 +780,7 @@ export function PaymentSuccessScreen() {
 
 export function AssetDetailScreen() {
   const router = useRouter();
+  const back = useSafeBack();
   const queryClient = useQueryClient();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['asset', id], queryFn: () => assetService.get(id ?? '') });
@@ -689,39 +792,100 @@ export function AssetDetailScreen() {
     },
   });
   if (isLoading) return <Screen><LoadingState /></Screen>;
-  if (isError || !data) return <Screen><Header title="Detalle del bien" onBack={() => router.back()} /><ErrorState onRetry={() => refetch()} /></Screen>;
+  if (isError || !data) return <Screen><Header title="Detalle del bien" onBack={back} /><ErrorState onRetry={() => refetch()} /></Screen>;
   return (
     <Screen>
-      <Header title="Detalle del bien" onBack={() => router.back()} />
-      <Card>
-        <Badge label={data.status} tone={data.status === 'Aceptado' ? 'green' : data.status === 'Rechazado' ? 'red' : 'yellow'} />
-        <Title>{data.title}</Title>
-        <Body muted>{data.detail}</Body>
-        {data.basePrice != null ? <SummaryLine label="Precio base" value={formatCurrency(data.basePrice)} /> : null}
-        {data.commission != null ? <SummaryLine label="Comisión" value={formatCurrency(data.commission)} /> : null}
-        {data.depositLocation ? <SummaryLine label="Depósito" value={data.depositLocation} /> : null}
+      <Header title="Detalle del bien" onBack={back} />
+      <Card style={[styles.itemCard, styles.assetHeroCard]}>
+        <View style={styles.cardHeaderRow}>
+          <View style={styles.cardHeaderCopy}>
+            <Badge label={data.status} tone={data.status === 'Aceptado' ? 'green' : data.status === 'Rechazado' ? 'red' : 'yellow'} />
+            <Title>{data.title}</Title>
+            <Body muted>{data.category}</Body>
+          </View>
+          <View style={styles.assetHeroIcon}><Ionicons name="cube-outline" size={24} color={colors.primary} /></View>
+        </View>
+        <Body>{data.detail}</Body>
+        <View style={styles.tileRow}>
+          <InfoTile icon="albums-outline" label="Fotos" value={data.photosUploaded != null ? String(data.photosUploaded) : 'No asignado'} />
+          <InfoTile icon="document-text-outline" label="Documentos" value={data.documentationAttached ? 'Adjunta' : 'No asignado'} tone={data.documentationAttached ? 'green' : 'yellow'} />
+        </View>
+        <Divider />
+        <SummaryRow label="Precio base" value={data.basePrice != null ? formatCurrency(data.basePrice) : 'No asignado'} />
+        <SummaryRow label="Comisión" value={data.commission != null ? formatCurrency(data.commission) : 'No asignado'} />
+        <SummaryRow label="Depósito" value={data.depositLocation ?? 'No asignado'} />
       </Card>
+      <Button label="Ver detalle completo" variant="secondary" icon="open-outline" onPress={() => router.push({ pathname: '/profile/assets/[id]/full', params: { id: data.id } })} />
       {data.status === 'Aceptado' ? <>
         <Button label="Aceptar condiciones" onPress={() => accept.mutate(true)} />
         <Button label="Rechazar condiciones" variant="secondary" onPress={() => accept.mutate(false)} />
       </> : null}
-      {accept.isSuccess ? <Card style={styles.okStatus}><Badge label="Respuesta enviada" tone="green" /><Body muted>Registramos tu decisión sobre las condiciones del bien.</Body></Card> : null}
+      {accept.isSuccess ? <StatusCard icon="checkmark-circle-outline" title="Respuesta enviada" message="Registramos tu decisión sobre las condiciones del bien." tone="green" /> : null}
       {accept.isError ? <Body muted>{accept.error instanceof Error ? accept.error.message : 'No fue posible registrar la decisión.'}</Body> : null}
+    </Screen>
+  );
+}
+
+export function AssetFullDetailScreen() {
+  const back = useSafeBack();
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['asset', id], queryFn: () => assetService.get(id ?? '') });
+
+  if (isLoading) return <Screen><LoadingState /></Screen>;
+  if (isError || !data) return <Screen><Header title="Detalle completo del bien" onBack={back} /><ErrorState onRetry={() => refetch()} /></Screen>;
+
+  return (
+    <Screen>
+      <Header title="Detalle completo del bien" subtitle={data.title} onBack={back} />
+      <Card style={[styles.itemCard, styles.assetHeroCard]}>
+        <View style={styles.cardHeaderRow}>
+          <View style={styles.cardHeaderCopy}>
+            <Badge label={data.status} tone={data.status === 'Aceptado' ? 'green' : data.status === 'Rechazado' ? 'red' : 'yellow'} />
+            <Title>{data.title}</Title>
+            <Body muted>{data.category}</Body>
+          </View>
+          <View style={styles.assetHeroIcon}><Ionicons name="analytics-outline" size={24} color={colors.primary} /></View>
+        </View>
+        <Body>{data.detail}</Body>
+      </Card>
+      <Card style={styles.itemCard}>
+        <SectionHeader title="Campos del bien" subtitle="Mostramos valores asignados y el estado cuando aún no hay datos" />
+        <SummaryRow label="Descripción técnica" value={data.technicalDescription ?? 'No asignado'} />
+        <SummaryRow label="Cantidad de elementos" value={data.quantity != null ? String(data.quantity) : 'No asignado'} />
+        <SummaryRow label="Información adicional" value={data.additionalInformation ?? 'No asignado'} />
+        <SummaryRow label="Precio base" value={data.basePrice != null ? formatCurrency(data.basePrice) : 'No asignado'} />
+        <SummaryRow label="Comisión" value={data.commission != null ? formatCurrency(data.commission) : 'No asignado'} />
+        <SummaryRow label="Depósito" value={data.depositLocation ?? 'No asignado'} />
+        <SummaryRow label="Póliza" value={data.policyId ?? 'No asignado'} />
+        <SummaryRow label="Fotos cargadas" value={data.photosUploaded != null ? String(data.photosUploaded) : 'No asignado'} />
+        <SummaryRow label="Documentación" value={data.documentationAttached ? 'Adjunta' : 'No asignado'} />
+      </Card>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
   notice: { alignItems: 'center', marginTop: spacing.huge },
+  noticeIcon: { width: 52, height: 52, borderRadius: radius.pill, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
   profileCard: { alignItems: 'center', backgroundColor: colors.surfaceAlt },
   tileRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, alignSelf: 'stretch' },
+  menuBlock: { gap: spacing.sm },
   avatar: { width: 62, height: 62, borderRadius: 31, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primarySoft },
   avatarText: { fontFamily: fonts.black, fontSize: 28, color: colors.primary },
   metricGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
+  metricChartCard: { gap: spacing.md },
   bars: { height: 105, flexDirection: 'row', gap: spacing.md, alignItems: 'flex-end', justifyContent: 'center' },
   bar: { width: 22, borderRadius: radius.sm, backgroundColor: colors.primary },
-  okStatus: { alignItems: 'center', backgroundColor: colors.successSoft },
-  problemStatus: { alignItems: 'center', backgroundColor: colors.dangerSoft },
+  summaryRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.md },
+  summaryValue: { color: colors.text, fontSize: typography.body, fontFamily: fonts.regular },
+  summaryValueBold: { fontFamily: fonts.black, color: colors.primaryDark },
+  itemCard: { gap: spacing.md },
+  cardHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.md },
+  cardHeaderCopy: { flex: 1, gap: 2 },
+  assetHeroCard: { gap: spacing.md, backgroundColor: colors.surfaceAlt },
+  assetHeroIcon: { width: 48, height: 48, borderRadius: radius.pill, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
+  cardActionsRow: { flexDirection: 'row', justifyContent: 'flex-end' },
+  penaltyCard: { alignItems: 'center', backgroundColor: colors.dangerSoft },
   penalty: { color: colors.danger, fontSize: typography.title, fontFamily: fonts.black },
   cardTitle: { color: colors.text, fontSize: typography.body, fontFamily: fonts.bold },
   between: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.md },
@@ -747,4 +911,16 @@ const styles = StyleSheet.create({
   userTime: { color: '#DED9FF' },
   compose: { marginTop: spacing.lg, gap: spacing.sm },
   successScreen: { alignItems: 'center', paddingTop: 70 },
+  overlaySoft: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: 'rgba(17,17,23,0.45)', alignItems: 'center', justifyContent: 'center', padding: spacing.xl, zIndex: 20 },
+  countryModal: { width: '100%', maxHeight: '82%', gap: spacing.md },
+  countryModalHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.md },
+  countryModalTitleCopy: { flex: 1, gap: spacing.xs },
+  countryList: { maxHeight: 420 },
+  countryListContent: { gap: spacing.sm, paddingBottom: spacing.sm },
+  countryRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.md, padding: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceAlt },
+  countryRowActive: { borderColor: colors.primaryBorder, backgroundColor: colors.primarySoft },
+  countryRowCopy: { flex: 1, gap: 2 },
+  countryRowTitle: { color: colors.textStrong, fontSize: typography.body, fontFamily: fonts.bold },
+  countryRowMeta: { alignItems: 'flex-end', gap: spacing.xs },
 });
+
