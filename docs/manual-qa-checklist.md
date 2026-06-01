@@ -4,6 +4,8 @@
 
 - [ ] Crear `.env` desde `.env.example`.
 - [ ] Configurar `EXPO_PUBLIC_API_URL` para Web, emulador o dispositivo.
+- [ ] Configurar `cloudinaryConfig.cloudName` y un `cloudinaryConfig.unsignedUploadPreset` en `src/services/cloudinary.ts`.
+- [ ] Confirmar que no exista `CLOUDINARY_API_SECRET` en variables o codigo del frontend.
 - [ ] Levantar backend y base no productiva con datos de prueba.
 - [ ] Ejecutar `npm install`.
 - [ ] Ejecutar `npm run lint`.
@@ -38,6 +40,9 @@
 - [ ] Subir bien abre seleccion de categoria.
 - [ ] Cantidad de elementos es obligatoria.
 - [ ] Fotos permiten cargar de 6 a 8 imagenes en Web y Android.
+- [ ] Al continuar, las fotos aparecen en Cloudinary dentro de `subastar/bienes`.
+- [ ] El backend recibe metadata JSON de Cloudinary para fotos, sin archivos binarios.
+- [ ] Si Cloudinary rechaza una imagen, se muestra el error y no se avanza a documentos.
 - [ ] Documentos permiten aceptar declaracion legal y adjuntar archivos.
 - [ ] Solicitud confirma y muestra el codigo devuelto por API.
 

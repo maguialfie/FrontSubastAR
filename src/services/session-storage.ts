@@ -1,38 +1,35 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-
 import type { Session } from '@/types/domain';
 
 export const SESSION_KEY = 'subastar.session';
 
+let sessionCache: Session | null = null;
+
 export async function readSessionValue() {
-  return AsyncStorage.getItem(SESSION_KEY);
+  return sessionCache ? JSON.stringify(sessionCache) : null;
 }
 
 export async function writeSessionValue(value: string | null) {
-  if (value) {
-    await AsyncStorage.setItem(SESSION_KEY, value);
+  if (!value) {
+    sessionCache = null;
     return;
   }
-  await AsyncStorage.removeItem(SESSION_KEY);
+
+  try {
+    sessionCache = JSON.parse(value) as Session;
+  } catch {
+    sessionCache = null;
+  }
 }
 
 export async function readSession() {
-  const stored = await readSessionValue();
-  if (!stored) return null;
-  try {
-    return JSON.parse(stored) as Session;
-  } catch {
-    await writeSessionValue(null);
-    return null;
-  }
+  return sessionCache;
 }
 
 export async function storeSession(session: Session | null) {
-  await writeSessionValue(session ? JSON.stringify(session) : null);
+  sessionCache = session;
 }
 
 export async function getToken() {
-  const session = await readSession();
-  return session?.token;
+  return sessionCache?.token;
 }
 

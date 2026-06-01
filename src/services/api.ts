@@ -18,6 +18,7 @@ import type {
   UserDetails,
   UserMetrics,
 } from '@/types/domain';
+import { uploadImageToCloudinary } from '@/services/cloudinary';
 import { apiConfig, apiRoutes, request, requestText } from '@/services/http';
 
 export const API_BASE_URL = apiConfig.baseUrl;
@@ -438,9 +439,24 @@ export const assetService = {
     });
   },
   async uploadPhotos(code: string, files: FileUpload[]) {
-    const form = new FormData();
-    files.forEach((file) => appendFile(form, 'fotos', file));
-    return request<BackendAssetSubmission>(apiRoutes.assetRequestPhotos(code), { method: 'POST', body: form });
+    const uploaded = await Promise.all(files.map(uploadImageToCloudinary));
+    return request<BackendAssetSubmission>(apiRoutes.assetRequestPhotos(code), {
+      method: 'POST',
+      body: JSON.stringify({
+        fotos: uploaded.map((asset) => ({
+          asset_id: asset.asset_id,
+          public_id: asset.public_id,
+          version: asset.version,
+          format: asset.format,
+          resource_type: asset.resource_type,
+          bytes: asset.bytes,
+          width: asset.width,
+          height: asset.height,
+          original_filename: asset.original_filename,
+          secure_url: asset.secure_url,
+        })),
+      }),
+    });
   },
   async uploadDocuments(code: string, declaration: boolean, files: FileUpload[]) {
     const form = new FormData();

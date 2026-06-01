@@ -282,7 +282,7 @@ export function PaymentsScreen() {
 
 export function AssetsScreen() {
   const router = useRouter();
-  const back = useSafeBack();
+  const back = () => router.replace('/(tabs)');
   const [status, setStatus] = useState('Todos');
   const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['assets', status], queryFn: () => assetService.list(status) });
   return (
@@ -538,7 +538,6 @@ export function PolicyScreen() {
 }
 
 export function ExtendPolicyScreen() {
-  const router = useRouter();
   const back = useSafeBack();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [newValue, setNewValue] = useState('');

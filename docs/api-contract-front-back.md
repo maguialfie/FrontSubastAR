@@ -49,7 +49,7 @@ Estados usados:
 |---|---|---|---|---|---|
 | Iniciar solicitud | `POST` | `/bienes/solicitudes` | `{ tipo }` | codigo y paso actual | Confirmar backend |
 | Guardar datos | `PUT` | `/bienes/solicitudes/{codigo}/datos` | datos del bien | estado de solicitud | Confirmar backend |
-| Cargar fotos | `POST` | `/bienes/solicitudes/{codigo}/fotos` | multipart `fotos` (6 a 8 desde UI) | estado de solicitud | Confirmar backend |
+| Cargar fotos | `POST` | `/bienes/solicitudes/{codigo}/fotos` | JSON `{ fotos: [{ asset_id, public_id, version, format, resource_type, bytes, width, height, original_filename, secure_url }] }` (6 a 8 desde UI) | estado de solicitud | Pendiente backend |
 | Cargar documentos | `POST` | `/bienes/solicitudes/{codigo}/documentos` | multipart `declara_propiedad`, `documentos` | estado de solicitud | Confirmar backend |
 | Confirmar solicitud | `POST` | `/bienes/solicitudes/{codigo}/confirmar` | - | codigo de bien y estado | Confirmar backend |
 | Mis bienes | `GET` | `/bienes/mis-bienes?estado=` | query opcional | lista de bienes | Confirmar backend |
@@ -81,6 +81,10 @@ Estados usados:
 ## Integracion Tecnica
 
 - La URL base se configura con `EXPO_PUBLIC_API_URL`; ver `.env.example`.
+- La carga unsigned de fotos a Cloudinary se configura en `src/services/cloudinary.ts` con `cloudinaryConfig.cloudName` y `cloudinaryConfig.unsignedUploadPreset`.
+- El frontend nunca debe recibir ni exponer `CLOUDINARY_API_SECRET`.
+- Las fotos se suben primero a `https://api.cloudinary.com/v1_1/{cloudName}/image/upload` dentro de `subastar/bienes`; el backend recibe metadata JSON, no binarios.
+- Para persistencia de fotos, `asset_id` y `public_id` son las referencias principales. `secure_url` es un dato auxiliar para lectura o preview.
 - El JWT se adjunta como `Authorization: Bearer <token>` y el frontend elimina sesion ante `401` autenticado.
 - Para `FormData`, el frontend no fija manualmente `Content-Type`; el runtime genera el boundary.
 - Los archivos se envian con `uri`, `name` y `type`, con valores de respaldo para Web y Android.
