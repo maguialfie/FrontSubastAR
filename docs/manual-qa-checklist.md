@@ -45,6 +45,12 @@
 - [ ] Si Cloudinary rechaza una imagen, se muestra el error y no se avanza a documentos.
 - [ ] Documentos permiten aceptar declaracion legal y adjuntar archivos.
 - [ ] Solicitud confirma y muestra el codigo devuelto por API.
+- [ ] Detalle completo del bien muestra galeria con imagen principal y miniaturas seleccionables.
+- [ ] Detalle completo muestra documentos adjuntos o un estado vacio sin romper la pantalla.
+- [ ] Editar informacion adicional y precio base sugerido refresca el detalle al guardar.
+- [ ] Editar precio base sugerido permite seleccionar `ARS` o `USD`.
+- [ ] Al guardar cambios del bien, se muestra un overlay bloqueante hasta completar el refetch del detalle.
+- [ ] Galeria del detalle completo rota cada 4 segundos y permite navegar con botones, dots y miniaturas.
 
 ## Perfil
 

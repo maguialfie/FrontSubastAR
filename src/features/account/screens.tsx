@@ -2,8 +2,8 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Image, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { PaymentMethodCard, PurchaseCard, formatCurrency } from '@/components/domain/cards';
 import { ActionRow, Badge, Body, Button, Card, ConfirmationModal, Divider, EmptyState, ErrorState, Header, IconButton, InfoTile, Input, LoadingState, Screen, SectionHeader, SecurityNote, SelectInput, StatusState, Title, UploadBox } from '@/components/ui/primitives';
@@ -84,6 +84,42 @@ function SummaryRow({ label, value, bold }: { label: string; value: string; bold
 
 function StatusCard({ icon, title, message, tone = 'purple' }: { icon: keyof typeof Ionicons.glyphMap; title: string; message: string; tone?: 'purple' | 'green' | 'red' | 'yellow' }) {
   return <StatusState icon={icon} title={title} message={message} tone={tone} />;
+}
+
+function openExternalUrl(url?: string) {
+  if (!url) return;
+  if (Platform.OS === 'web') {
+    window.open(url, '_blank', 'noopener,noreferrer');
+    return;
+  }
+  Linking.openURL(url);
+}
+
+function AssetField({ label, value }: { label: string; value?: string }) {
+  return (
+    <View style={styles.fieldCard}>
+      <Body muted>{label}</Body>
+      <Text style={styles.fieldValue}>{value || 'No asignado'}</Text>
+    </View>
+  );
+}
+
+function formatAmountWithCurrency(amount: number, currency?: string | null) {
+  return `${currency ?? 'ARS'} ${amount.toLocaleString('es-AR')}`;
+}
+
+function LoadingOverlay({ visible }: { visible: boolean }) {
+  return (
+    <Modal visible={visible} transparent animationType="fade">
+      <View style={styles.loadingOverlay}>
+        <Card style={styles.loadingOverlayCard}>
+          <ActivityIndicator color={colors.primary} size="large" />
+          <Title>Actualizando el bien</Title>
+          <Body muted>Guardamos tus cambios y refrescamos la información.</Body>
+        </Card>
+      </View>
+    </Modal>
+  );
 }
 
 function GuestNotice() {
@@ -827,8 +863,61 @@ export function AssetDetailScreen() {
 
 export function AssetFullDetailScreen() {
   const back = useSafeBack();
+  const queryClient = useQueryClient();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['asset', id], queryFn: () => assetService.get(id ?? '') });
+  const [photoIndex, setPhotoIndex] = useState(0);
+  const [editing, setEditing] = useState(false);
+  const [additionalInformation, setAdditionalInformation] = useState('');
+  const [suggestedBasePrice, setSuggestedBasePrice] = useState('');
+  const [suggestedBasePriceCurrency, setSuggestedBasePriceCurrency] = useState('ARS');
+  const photos = data?.photos?.filter((photo) => photo.url) ?? [];
+  const selectedPhoto = photos[photoIndex];
+  const numericSuggestedBasePrice = suggestedBasePrice ? Number(suggestedBasePrice) : undefined;
+  const invalidSuggestedBasePrice = numericSuggestedBasePrice != null && (!Number.isFinite(numericSuggestedBasePrice) || numericSuggestedBasePrice <= 0);
+  const updateAsset = useMutation({
+    mutationFn: async () => {
+      await assetService.update(id ?? '', {
+        additionalInformation,
+        suggestedBasePrice: numericSuggestedBasePrice,
+        suggestedBasePriceCurrency: suggestedBasePriceCurrency || undefined,
+      });
+      return assetService.get(id ?? '');
+    },
+    onSuccess: (updatedAsset) => {
+      queryClient.setQueryData(['asset', id], updatedAsset);
+      queryClient.invalidateQueries({ queryKey: ['assets'] });
+      setEditing(false);
+    },
+  });
+
+  useEffect(() => {
+    if (!editing && data) {
+      setAdditionalInformation(data.additionalInformation ?? '');
+      setSuggestedBasePrice(data.suggestedBasePrice != null ? String(data.suggestedBasePrice) : '');
+      setSuggestedBasePriceCurrency(data.suggestedBasePriceCurrency ?? 'ARS');
+    }
+  }, [data, editing]);
+
+  useEffect(() => {
+    if (photos.length <= 1) return;
+    const intervalId = setInterval(() => setPhotoIndex((current) => (current + 1) % photos.length), 4000);
+    return () => clearInterval(intervalId);
+  }, [photos.length]);
+
+  useEffect(() => {
+    if (photoIndex >= photos.length) setPhotoIndex(0);
+  }, [photoIndex, photos.length]);
+
+  function goPrev() {
+    if (!photos.length) return;
+    setPhotoIndex((current) => current === 0 ? photos.length - 1 : current - 1);
+  }
+
+  function goNext() {
+    if (!photos.length) return;
+    setPhotoIndex((current) => (current + 1) % photos.length);
+  }
 
   if (isLoading) return <Screen><LoadingState /></Screen>;
   if (isError || !data) return <Screen><Header title="Detalle completo del bien" onBack={back} /><ErrorState onRetry={() => refetch()} /></Screen>;
@@ -847,18 +936,112 @@ export function AssetFullDetailScreen() {
         </View>
         <Body>{data.detail}</Body>
       </Card>
-      <Card style={styles.itemCard}>
-        <SectionHeader title="Campos del bien" subtitle="Mostramos valores asignados y el estado cuando aún no hay datos" />
-        <SummaryRow label="Descripción técnica" value={data.technicalDescription ?? 'No asignado'} />
-        <SummaryRow label="Cantidad de elementos" value={data.quantity != null ? String(data.quantity) : 'No asignado'} />
-        <SummaryRow label="Información adicional" value={data.additionalInformation ?? 'No asignado'} />
-        <SummaryRow label="Precio base" value={data.basePrice != null ? formatCurrency(data.basePrice) : 'No asignado'} />
-        <SummaryRow label="Comisión" value={data.commission != null ? formatCurrency(data.commission) : 'No asignado'} />
-        <SummaryRow label="Depósito" value={data.depositLocation ?? 'No asignado'} />
-        <SummaryRow label="Póliza" value={data.policyId ?? 'No asignado'} />
-        <SummaryRow label="Fotos cargadas" value={data.photosUploaded != null ? String(data.photosUploaded) : 'No asignado'} />
-        <SummaryRow label="Documentación" value={data.documentationAttached ? 'Adjunta' : 'No asignado'} />
+      <Card style={styles.assetGalleryCard}>
+        <SectionHeader title="Galería del bien" subtitle={`${photos.length} imágenes cargadas`} />
+        {selectedPhoto?.url ? (
+          <View style={styles.carouselFrame}>
+            <Image source={{ uri: selectedPhoto.url }} style={styles.assetMainPhoto} resizeMode="cover" />
+            {photos.length > 1 ? (
+              <>
+                <Pressable style={[styles.carouselButton, styles.carouselButtonLeft]} onPress={goPrev}>
+                  <Ionicons name="chevron-back" size={22} color="#FFF" />
+                </Pressable>
+                <Pressable style={[styles.carouselButton, styles.carouselButtonRight]} onPress={goNext}>
+                  <Ionicons name="chevron-forward" size={22} color="#FFF" />
+                </Pressable>
+                <View style={styles.carouselDots}>
+                  {photos.map((photo, index) => (
+                    <Pressable key={photo.id} onPress={() => setPhotoIndex(index)} style={[styles.carouselDot, index === photoIndex && styles.carouselDotActive]} />
+                  ))}
+                </View>
+              </>
+            ) : null}
+          </View>
+        ) : (
+          <EmptyState title="Sin fotos disponibles" message="Las fotos cargadas aparecerán acá." />
+        )}
+        {photos.length > 1 ? (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.assetThumbRow}>
+            {photos.map((photo, index) => (
+              <Pressable
+                key={photo.id}
+                style={[styles.assetThumbButton, index === photoIndex && styles.assetThumbButtonActive]}
+                onPress={() => setPhotoIndex(index)}>
+                <Image source={{ uri: photo.url }} style={styles.assetThumb} resizeMode="cover" />
+              </Pressable>
+            ))}
+          </ScrollView>
+        ) : null}
       </Card>
+      <Card style={styles.itemCard}>
+        <SectionHeader title="Información declarada" subtitle="Datos informados al iniciar la solicitud" />
+        <View style={styles.fieldGrid}>
+          <AssetField label="Descripción técnica" value={data.technicalDescription} />
+          <AssetField label="Cantidad de elementos" value={data.quantity != null ? String(data.quantity) : undefined} />
+          <AssetField label="Información adicional" value={data.additionalInformation} />
+          {data.originPeriod ? <AssetField label="Época u origen" value={data.originPeriod} /> : null}
+          {data.artistDesigner ? <AssetField label="Artista o diseñador" value={data.artistDesigner} /> : null}
+          {data.historicalData ? <AssetField label="Datos históricos" value={data.historicalData} /> : null}
+        </View>
+      </Card>
+      <Card style={styles.itemCard}>
+        <SectionHeader title="Condiciones de subasta" subtitle="Valores y asignaciones definidos para el bien" />
+        <View style={styles.fieldGrid}>
+          <AssetField label="Precio base asignado" value={data.basePrice != null ? formatCurrency(data.basePrice) : undefined} />
+          <AssetField label="Precio base sugerido" value={data.suggestedBasePrice != null ? formatAmountWithCurrency(data.suggestedBasePrice, data.suggestedBasePriceCurrency) : undefined} />
+          <AssetField label="Comisión" value={data.commission != null ? formatCurrency(data.commission) : undefined} />
+          <AssetField label="Subasta asignada" value={data.assignedAuction} />
+          <AssetField label="Depósito" value={data.depositLocation} />
+          <AssetField label="Póliza" value={data.policyId} />
+        </View>
+        <SecurityNote text="El precio base sugerido puede ser revisado por la empresa antes de asignar el bien a una subasta." />
+      </Card>
+      <Card style={styles.itemCard}>
+        <SectionHeader title="Documentación adjunta" subtitle={data.documents?.length ? `${data.documents.length} archivo(s)` : 'Sin archivos disponibles'} />
+        {data.documents?.length ? data.documents.map((document) => (
+          <View key={document.id} style={styles.documentRow}>
+            <View style={styles.documentIcon}>
+              <Ionicons name={document.contentType === 'application/pdf' ? 'document-text-outline' : 'image-outline'} size={22} color={colors.primary} />
+            </View>
+            <View style={styles.flex}>
+              <Text style={styles.cardTitle}>{document.name ?? 'Documento adjunto'}</Text>
+              <Body muted>{document.contentType ?? document.type ?? 'Archivo'}</Body>
+            </View>
+            <Button label="Ver" variant="secondary" size="sm" disabled={!document.url} onPress={() => openExternalUrl(document.url)} />
+          </View>
+        )) : (
+          <EmptyState title="Sin documentación visible" message="Cuando haya documentos adjuntos aparecerán en esta sección." />
+        )}
+      </Card>
+      <Card style={styles.itemCard}>
+        <SectionHeader title="Editar datos del bien" subtitle="Podés ajustar información visible para la revisión de la empresa" />
+        {!editing ? (
+          <>
+            <Body muted>Estos datos ayudan a la empresa a preparar la futura subasta del bien.</Body>
+            <Button label="Editar información" variant="secondary" onPress={() => setEditing(true)} />
+          </>
+        ) : (
+          <>
+            <Input label="Información adicional" value={additionalInformation} onChangeText={setAdditionalInformation} multiline />
+            <Input label="Precio base sugerido" value={suggestedBasePrice} onChangeText={setSuggestedBasePrice} keyboardType="number-pad" />
+            <Body muted>Divisa del precio sugerido</Body>
+            <View style={styles.currencyToggle}>
+              {['ARS', 'USD'].map((currency) => (
+                <Pressable key={currency} onPress={() => setSuggestedBasePriceCurrency(currency)} style={[styles.currencyOption, suggestedBasePriceCurrency === currency && styles.currencyOptionActive]}>
+                  <Text style={[styles.currencyOptionText, suggestedBasePriceCurrency === currency && styles.currencyOptionTextActive]}>{currency}</Text>
+                </Pressable>
+              ))}
+            </View>
+            <Body muted>El precio base sugerido no abre la subasta automáticamente. La empresa puede revisarlo antes de asignar el bien.</Body>
+            <View style={styles.editActionsRow}>
+              <Button label={updateAsset.isPending ? 'Guardando...' : 'Guardar cambios'} disabled={updateAsset.isPending || invalidSuggestedBasePrice || (!!suggestedBasePrice && !suggestedBasePriceCurrency)} onPress={() => updateAsset.mutate()} />
+              <Button label="Cancelar" variant="secondary" disabled={updateAsset.isPending} onPress={() => setEditing(false)} />
+            </View>
+            {updateAsset.isError ? <Body muted>{updateAsset.error instanceof Error ? updateAsset.error.message : 'No fue posible guardar los cambios.'}</Body> : null}
+          </>
+        )}
+      </Card>
+      <LoadingOverlay visible={updateAsset.isPending} />
     </Screen>
   );
 }
@@ -883,6 +1066,32 @@ const styles = StyleSheet.create({
   cardHeaderCopy: { flex: 1, gap: 2 },
   assetHeroCard: { gap: spacing.md, backgroundColor: colors.surfaceAlt },
   assetHeroIcon: { width: 48, height: 48, borderRadius: radius.pill, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
+  assetGalleryCard: { gap: spacing.md },
+  carouselFrame: { position: 'relative', overflow: 'hidden', borderRadius: radius.lg, backgroundColor: colors.surfaceAlt },
+  carouselButton: { position: 'absolute', top: '50%', marginTop: -22, width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(17,17,23,0.55)' },
+  carouselButtonLeft: { left: spacing.md },
+  carouselButtonRight: { right: spacing.md },
+  carouselDots: { position: 'absolute', left: 0, right: 0, bottom: spacing.md, flexDirection: 'row', justifyContent: 'center', gap: spacing.xs },
+  carouselDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.55)' },
+  carouselDotActive: { width: 22, backgroundColor: '#FFF' },
+  assetMainPhoto: { width: '100%', height: 320, borderRadius: radius.lg, backgroundColor: colors.surfaceAlt },
+  assetThumbRow: { gap: spacing.sm, paddingVertical: spacing.sm },
+  assetThumbButton: { borderWidth: 2, borderColor: 'transparent', borderRadius: radius.md, padding: 2 },
+  assetThumbButtonActive: { borderColor: colors.primary },
+  assetThumb: { width: 84, height: 84, borderRadius: radius.sm, backgroundColor: colors.surfaceAlt },
+  documentRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surfaceAlt },
+  documentIcon: { width: 42, height: 42, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primarySoft },
+  editActionsRow: { flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' },
+  fieldGrid: { gap: spacing.sm },
+  fieldCard: { padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.surfaceAlt, borderWidth: 1, borderColor: colors.border, gap: spacing.xs },
+  fieldValue: { color: colors.textStrong, fontSize: typography.body, fontFamily: fonts.medium },
+  currencyToggle: { flexDirection: 'row', gap: spacing.sm },
+  currencyOption: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceAlt },
+  currencyOptionActive: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
+  currencyOptionText: { color: colors.textMuted, fontFamily: fonts.medium },
+  currencyOptionTextActive: { color: colors.primary, fontFamily: fonts.bold },
+  loadingOverlay: { flex: 1, backgroundColor: 'rgba(17,17,23,0.55)', alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
+  loadingOverlayCard: { width: '100%', maxWidth: 360, alignItems: 'center', gap: spacing.md },
   cardActionsRow: { flexDirection: 'row', justifyContent: 'flex-end' },
   penaltyCard: { alignItems: 'center', backgroundColor: colors.dangerSoft },
   penalty: { color: colors.danger, fontSize: typography.title, fontFamily: fonts.black },

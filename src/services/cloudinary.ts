@@ -5,6 +5,13 @@ const cloudinaryConfig = {
   unsignedUploadPreset: 'subastar_bienes_unsigned',
 };
 
+export function buildCloudinaryDeliveryUrl(publicId?: string | null, url?: string | null) {
+  if (url) return url;
+  if (!publicId) return undefined;
+
+  return `https://res.cloudinary.com/${cloudinaryConfig.cloudName}/image/upload/f_auto,q_auto/${publicId}`;
+}
+
 export type CloudinaryUploadResult = {
   asset_id: string;
   public_id: string;

@@ -54,6 +54,7 @@ Estados usados:
 | Confirmar solicitud | `POST` | `/bienes/solicitudes/{codigo}/confirmar` | - | codigo de bien y estado | Confirmar backend |
 | Mis bienes | `GET` | `/bienes/mis-bienes?estado=` | query opcional | lista de bienes | Confirmar backend |
 | Detalle de bien | `GET` | `/bienes/mis-bienes/{id}` | - | bien | Confirmar backend |
+| Editar datos de bien | `PATCH` | `/bienes/mis-bienes/{id}` | `{ informacion_adicional, precio_base_sugerido, divisa_precio_base_sugerido }` | bien actualizado | Pendiente backend |
 | Condiciones del bien | `POST` | `/bienes/mis-bienes/{id}/aceptar-condiciones` | `{ acepta }` | `{ message }` | Confirmar backend |
 
 ## Compras Y Seguros

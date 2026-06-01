@@ -18,7 +18,7 @@ import type {
   UserDetails,
   UserMetrics,
 } from '@/types/domain';
-import { uploadImageToCloudinary } from '@/services/cloudinary';
+import { buildCloudinaryDeliveryUrl, uploadImageToCloudinary } from '@/services/cloudinary';
 import { apiConfig, apiRoutes, request, requestText } from '@/services/http';
 
 export const API_BASE_URL = apiConfig.baseUrl;
@@ -48,10 +48,18 @@ type BackendLive = {
   segundos_restantes?: number; historial_pujas?: BackendBid[];
 };
 type BackendPayment = { id: number; tipo: string; descripcion: string; verificado: boolean; monto_disponible?: number };
+type BackendAssetPhoto = {
+  codigo_foto: string; nombre_archivo?: string | null; public_id?: string | null; url?: string | null; tipo?: string | null;
+};
+type BackendAssetDocument = {
+  codigo_documento: string; nombre_archivo?: string | null; url?: string | null; tipo?: string | null; content_type?: string | null;
+};
 type BackendAsset = {
-  id: number; nombre: string; estado: string; motivo_rechazo?: string; subasta_asignada?: string; precio_base?: number;
-  comision?: number; ubicacion_deposito?: string; poliza_id?: number; descripcion_tecnica?: string; cantidad_elementos?: number;
-  informacion_adicional?: string; fotos_cargadas?: number; documentacion_adjunta?: boolean;
+  id: number; nombre: string; tipo?: string | null; estado: string; motivo_rechazo?: string | null; subasta_asignada?: string | null; precio_base?: number | null;
+  comision?: number | null; ubicacion_deposito?: string | null; poliza_id?: string | number | null; descripcion_tecnica?: string | null; cantidad_elementos?: number | null;
+  informacion_adicional?: string | null; epoca_origen?: string | null; artista_disenador?: string | null; datos_historicos?: string | null;
+  precio_base_sugerido?: number | null; divisa_precio_base_sugerido?: string | null;
+  fotos_cargadas?: number; documentacion_adjunta?: boolean; fotos?: BackendAssetPhoto[]; documentos?: BackendAssetDocument[];
 };
 type BackendPurchase = {
   id: number; nombre_item: string; subasta: string; fecha?: string; valor_pujado: number; multa: number;
@@ -154,18 +162,38 @@ function mapAsset(asset: BackendAsset): OwnedAsset {
   return {
     id: String(asset.id),
     title: asset.nombre,
-    category: asset.subasta_asignada ?? 'Sin asignar',
+    category: asset.tipo ?? asset.subasta_asignada ?? 'Sin asignar',
     status: normalizedStatus === 'aceptado' ? 'Aceptado' : normalizedStatus === 'rechazado' ? 'Rechazado' : 'Pendiente',
     detail: asset.descripcion_tecnica ?? asset.motivo_rechazo ?? asset.subasta_asignada ?? 'En evaluación',
-    technicalDescription: asset.descripcion_tecnica,
-    quantity: asset.cantidad_elementos,
-    additionalInformation: asset.informacion_adicional,
-    basePrice: asset.precio_base,
-    commission: asset.comision,
-    depositLocation: asset.ubicacion_deposito,
+    technicalDescription: asset.descripcion_tecnica ?? undefined,
+    quantity: asset.cantidad_elementos ?? undefined,
+    additionalInformation: asset.informacion_adicional ?? undefined,
+    originPeriod: asset.epoca_origen ?? undefined,
+    artistDesigner: asset.artista_disenador ?? undefined,
+    historicalData: asset.datos_historicos ?? undefined,
+    basePrice: asset.precio_base ?? undefined,
+    suggestedBasePrice: asset.precio_base_sugerido,
+    suggestedBasePriceCurrency: asset.divisa_precio_base_sugerido ?? null,
+    commission: asset.comision ?? undefined,
+    assignedAuction: asset.subasta_asignada ?? undefined,
+    depositLocation: asset.ubicacion_deposito ?? undefined,
     policyId: asset.poliza_id ? String(asset.poliza_id) : undefined,
     photosUploaded: asset.fotos_cargadas,
     documentationAttached: asset.documentacion_adjunta,
+    photos: (asset.fotos ?? []).map((photo) => ({
+      id: photo.codigo_foto,
+      name: photo.nombre_archivo ?? undefined,
+      publicId: photo.public_id ?? undefined,
+      url: buildCloudinaryDeliveryUrl(photo.public_id, photo.url),
+      type: photo.tipo ?? undefined,
+    })),
+    documents: (asset.documentos ?? []).map((document) => ({
+      id: document.codigo_documento,
+      name: document.nombre_archivo ?? undefined,
+      url: document.url ?? undefined,
+      type: document.tipo ?? undefined,
+      contentType: document.content_type ?? undefined,
+    })),
   };
 }
 
@@ -423,6 +451,16 @@ export const assetService = {
   },
   async get(id: string): Promise<OwnedAsset> {
     return mapAsset(await request<BackendAsset>(apiRoutes.asset(id)));
+  },
+  async update(id: string | number, input: { additionalInformation?: string; suggestedBasePrice?: number; suggestedBasePriceCurrency?: string }): Promise<OwnedAsset> {
+    return mapAsset(await request<BackendAsset>(apiRoutes.asset(String(id)), {
+      method: 'PATCH',
+      body: JSON.stringify({
+        informacion_adicional: input.additionalInformation,
+        precio_base_sugerido: input.suggestedBasePrice,
+        divisa_precio_base_sugerido: input.suggestedBasePriceCurrency,
+      }),
+    }));
   },
   async start(type: string) {
     const value = await request<BackendAssetSubmission>(apiRoutes.assetRequest, { method: 'POST', body: JSON.stringify({ tipo: type }) });

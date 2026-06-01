@@ -82,12 +82,32 @@ export interface OwnedAsset {
   technicalDescription?: string;
   quantity?: number;
   additionalInformation?: string;
+  originPeriod?: string;
+  artistDesigner?: string;
+  historicalData?: string;
   basePrice?: number;
+  suggestedBasePrice?: number | null;
+  suggestedBasePriceCurrency?: string | null;
   commission?: number;
+  assignedAuction?: string;
   depositLocation?: string;
   policyId?: string;
   photosUploaded?: number;
   documentationAttached?: boolean;
+  photos?: {
+    id: string;
+    name?: string;
+    publicId?: string;
+    url?: string;
+    type?: string;
+  }[];
+  documents?: {
+    id: string;
+    name?: string;
+    url?: string;
+    type?: string;
+    contentType?: string;
+  }[];
 }
 
 export interface Conversation {
