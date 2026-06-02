@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -238,10 +238,15 @@ export function SellDocumentsScreen() {
 export function SellReviewScreen() {
   const router = useRouter();
   const back = useSafeBack();
+  const queryClient = useQueryClient();
   const params = useLocalSearchParams<{ amount: string; code: string; name: string; type: string; photos: string; documents: string }>();
   const confirm = useMutation({
     mutationFn: () => assetService.confirm(params.code ?? ''),
-    onSuccess: (response) => router.replace({ pathname: '/sell/success', params: { code: response.codigo_solicitud, status: response.estado } }),
+    onSuccess: (response) => {
+      queryClient.invalidateQueries({ queryKey: ['notifications-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['chats'] });
+      router.replace({ pathname: '/sell/success', params: { code: response.codigo_solicitud, status: response.estado } });
+    },
   });
   return (
     <Screen>

@@ -62,20 +62,23 @@ Estados usados:
 | Flujo | Metodo | Endpoint Front | Body enviado | Respuesta esperada | Estado |
 |---|---|---|---|---|---|
 | Mis compras | `GET` | `/compras` | - | lista de compras | Confirmar backend |
-| Detalle compra | `GET` | `/compras/{id}` | - | compra con entrega y posible `poliza_id` | Confirmar backend |
+| Detalle compra | `GET` | `/compras/{id}` | - | compra con entrega y posibles `poliza_id`, `numero_poliza` | Confirmar backend |
 | Regularizar pago | `POST` | `/compras/{id}/regularizar-pago` | `{ medio_pago_id }` | compra actualizada | Confirmar backend |
 | Datos factura | `GET` | `/compras/{id}/factura` | - | `{ message, url }` | Confirmar backend |
 | Descargar factura | `GET` | `/compras/{id}/factura/download` | - | contenido descargable/texto | Confirmar backend |
 | Consultar poliza | `GET` | `/seguros/{id}` | - | poliza y contacto | Confirmar backend |
 | Ampliar poliza | `POST` | `/seguros/{id}/ampliar` | `{ nuevo_valor_asegurado }` | poliza actualizada | Confirmar backend |
 | Historial de participaciones | `GET` | `/compras` | - | solo ganadas asociadas a compras | Parcial |
-| Seguros y Polizas | `GET` | `/compras` | - | polizas derivadas de compras con `poliza_id` | Parcial |
+| Seguros y Polizas | `GET` | `/compras` | - | polizas derivadas de compras con `poliza_id`, `numero_poliza` | Parcial |
 
 ## Chat
 
 | Flujo | Metodo | Endpoint Front | Body enviado | Respuesta esperada | Estado |
 |---|---|---|---|---|---|
 | Conversaciones | `GET` | `/chat/conversaciones` | - | lista de conversaciones | Confirmar backend |
+| Resumen de notificaciones | `GET` | `/chat/notificaciones/resumen` | - | total no leidas y desglose por tipo | Confirmar backend |
+| Listar notificaciones | `GET` | `/chat/notificaciones` | - | lista de avisos del usuario | Confirmar backend |
+| Marcar notificaciones leidas | `POST` | `/chat/notificaciones/marcar-leidas` | `{ tipos? }` | sin contenido | Confirmar backend |
 | Mensajes | `GET` | `/chat/conversaciones/{tipo}` | - | lista de mensajes | Confirmar backend |
 | Enviar mensaje | `POST` | `/chat/conversaciones/{tipo}/mensajes` | `{ contenido }` | mensaje creado | Pendiente backend |
 

@@ -285,6 +285,8 @@ export function PaymentsScreen() {
     onSuccess: () => {
       setSelectedForRemoval(undefined);
       queryClient.invalidateQueries({ queryKey: ['payments'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['chats'] });
     },
   });
   return (
@@ -381,7 +383,8 @@ export function PoliciesScreen() {
       {isLoading ? <LoadingState /> : isError ? <ErrorState onRetry={() => refetch()} /> : insuredPurchases.length ? insuredPurchases.map((purchase) => (
         <Card key={purchase.insuranceId} style={styles.itemCard}>
           <Badge label="Póliza activa" tone="green" />
-          <Title>{purchase.lot.title}</Title>
+          <Title>{purchase.insuranceNumber ?? purchase.insuranceId}</Title>
+          <Body muted>{purchase.lot.title}</Body>
           <Body muted>{purchase.auctionName ?? 'Compra asegurada'}</Body>
           <Button label="Ver póliza de seguro" onPress={() => router.push(`/policy/${purchase.insuranceId}`)} />
         </Card>
@@ -428,13 +431,12 @@ export function PurchaseDetailScreen() {
       {data.paymentStatus.toLowerCase() !== 'pagado' ? <Button label="Regularizar pago" onPress={() => router.push(`/purchases/${id}/payment`)} /> : null}
       <Button label="Ver factura" variant="secondary" icon="document-text-outline" onPress={() => router.push(`/purchases/${id}/invoice`)} />
       {data.insuranceId ? (
-        <>
-          <Card style={styles.policy}>
-            <Badge label="Envío cubierto" tone="green" />
-            <Body muted>Este lote cuenta con una póliza asociada para la cobertura informada.</Body>
-          </Card>
+        <Card style={styles.policy}>
+          <Badge label="Póliza asociada" tone="green" />
+          <Body muted>Esta compra tiene una póliza disponible para consultar o ampliar.</Body>
+          {data.insuranceNumber ? <SummaryRow label="Número de póliza" value={data.insuranceNumber} /> : null}
           <Button label="Ver póliza de seguro" onPress={() => router.push(`/policy/${data.insuranceId}`)} />
-        </>
+        </Card>
       ) : null}
     </Screen>
   );
@@ -453,6 +455,8 @@ export function PurchasePaymentScreen() {
     mutationFn: () => purchaseService.regularize(id ?? '', paymentId),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['purchase', id] });
+      queryClient.invalidateQueries({ queryKey: ['notifications-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['chats'] });
       router.replace(`/purchases/${id}`);
     },
   });
@@ -506,7 +510,7 @@ export function DeliveryScreen() {
       <StatusCard icon={ready ? 'location-outline' : moving ? 'car-outline' : delivered ? 'checkmark-circle-outline' : 'time-outline'} title={title} message={text} tone={delivered || ready ? 'green' : 'purple'} />
       {data.insuranceId ? (
         <Card style={styles.itemCard}>
-          <Badge label="Envío cubierto" tone="green" />
+          <Badge label="Póliza asociada" tone="green" />
           <Body muted>La cobertura asociada al lote acompaña esta entrega.</Body>
           <Button label="Ver póliza" variant="secondary" onPress={() => router.push(`/policy/${data.insuranceId}`)} />
         </Card>
@@ -520,18 +524,57 @@ export function DeliveryScreen() {
 export function InvoiceScreen() {
   const back = useSafeBack();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { data, isLoading, isError, refetch } = useQuery({
+  const { data: content, isLoading: loadingContent, isError: contentError, refetch: refetchContent } = useQuery({
     queryKey: ['invoice-content', id],
     queryFn: () => purchaseService.invoiceContent(id ?? ''),
   });
-  if (isLoading) return <Screen><LoadingState /></Screen>;
-  if (isError || !data) return <Screen><Header title="Factura" onBack={back} /><ErrorState onRetry={() => refetch()} /></Screen>;
+  const { data: purchase, isLoading: loadingPurchase, isError: purchaseError, refetch: refetchPurchase } = useQuery({
+    queryKey: ['purchase', id],
+    queryFn: () => purchaseService.get(id ?? ''),
+  });
+  const download = useMutation({ mutationFn: () => purchaseService.downloadInvoice(id ?? '') });
+  const [copied, setCopied] = useState(false);
+  async function copyContent() {
+    if (!content || Platform.OS !== 'web' || !navigator.clipboard) return;
+    await navigator.clipboard.writeText(content);
+    setCopied(true);
+  }
+  if (loadingContent || loadingPurchase) return <Screen><LoadingState /></Screen>;
+  if (contentError || purchaseError || !content || !purchase) return <Screen><Header title="Factura" onBack={back} /><ErrorState onRetry={() => { refetchContent(); refetchPurchase(); }} /></Screen>;
   return (
     <Screen>
       <Header title="Factura" onBack={back} />
-      <StatusCard icon="document-text-outline" title="Comprobante de compra" message="Factura emitida por SubastAR" tone="purple" />
+      <Card style={styles.invoiceHero}>
+        <View style={styles.invoiceHeroHeader}>
+          <View style={styles.invoiceIcon}><Ionicons name="document-text-outline" size={28} color={colors.primary} /></View>
+          <Badge label={purchase.paymentStatus} tone={purchase.paymentStatus.toLowerCase() === 'pagado' ? 'green' : 'yellow'} />
+        </View>
+        <View style={styles.invoiceHeroCopy}>
+          <Title>Comprobante de compra</Title>
+          <Body muted>Factura emitida por SubastAR</Body>
+        </View>
+      </Card>
+      <View style={styles.invoiceMetaGrid}>
+        <InfoTile icon="cube-outline" label="Item" value={purchase.lot.title} />
+        <InfoTile icon="cash-outline" label="Total" value={formatCurrency(purchase.total ?? purchase.amount)} />
+        <InfoTile icon="card-outline" label="Pago" value={purchase.paymentStatus} tone={purchase.paymentStatus.toLowerCase() === 'pagado' ? 'green' : 'yellow'} />
+        <InfoTile icon="car-outline" label="Entrega" value={purchase.deliveryStatus} />
+      </View>
       <Card style={styles.itemCard}>
-        <Text style={styles.invoiceText}>{data}</Text>
+        <SectionHeader title="Exportar comprobante" subtitle="Descargá el archivo .txt o guardalo desde el menú de tu celular" />
+        <View style={styles.invoiceActions}>
+          <Button label={download.isPending ? 'Descargando...' : 'Descargar TXT'} icon="download-outline" disabled={download.isPending} onPress={() => download.mutate()} />
+          {Platform.OS === 'web' && navigator.clipboard ? <Button label={copied ? 'Contenido copiado' : 'Copiar contenido'} variant="secondary" icon="copy-outline" onPress={copyContent} /> : null}
+        </View>
+        {download.isError ? <Body muted>No fue posible descargar la factura.</Body> : null}
+      </Card>
+      <Card style={styles.itemCard}>
+        <SectionHeader title="Vista previa" subtitle="Contenido completo de la factura" />
+        <View style={styles.invoicePaper}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <Text style={styles.invoiceText}>{content}</Text>
+          </ScrollView>
+        </View>
       </Card>
     </Screen>
   );
@@ -625,24 +668,52 @@ export function ChatsScreen() {
   const router = useRouter();
   const { session } = useSession();
   const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['chats'], queryFn: chatService.conversations, enabled: !!session });
+  const { data: notificationsSummary } = useQuery({ queryKey: ['notifications-summary'], queryFn: chatService.notificationsSummary, enabled: !!session });
+  const notificationChats = data?.filter((chat) => chat.id === 'bot' || chat.id === 'notificaciones') ?? [];
+  const regularChats = data?.filter((chat) => chat.id !== 'bot' && chat.id !== 'notificaciones') ?? [];
+  const botNotifications = {
+    id: 'bot',
+    name: 'Bot - Notificaciones',
+    lastMessage: notificationChats.find((chat) => chat.id === 'notificaciones')?.lastMessage
+      || notificationChats.find((chat) => chat.id === 'bot')?.lastMessage
+      || 'Avisos sobre compras, pujas, bienes, pagos y multas',
+    unread: Math.max(
+      notificationChats.reduce((total, chat) => total + chat.unread, 0),
+      notificationsSummary?.totalUnread ?? 0,
+    ),
+  };
+  const visibleChats = data ? [botNotifications, ...regularChats] : [];
   return (
     <Screen>
       <Header title="Chats" />
-      {!session ? <GuestNotice /> : isLoading ? <LoadingState /> : isError ? <ErrorState onRetry={() => refetch()} /> : data?.length ? data.map((chat) => (
-        <Pressable key={chat.id} onPress={() => router.push(`/chat/${chat.id}`)}>
-          <Card style={styles.chatRow}>
-            <View style={styles.chatIcon}><Ionicons name="chatbubble-outline" size={20} color={colors.primary} /></View>
+      {!session ? <GuestNotice /> : isLoading ? <LoadingState /> : isError ? <ErrorState onRetry={() => refetch()} /> : visibleChats.length ? visibleChats.map((chat) => {
+        const isBotNotifications = chat.id === 'bot';
+        return (
+        <Pressable key={chat.id} onPress={() => router.push(isBotNotifications ? '/chat/notificaciones' : `/chat/${chat.id}`)}>
+          <Card style={[styles.chatRow, isBotNotifications && styles.botNotificationsRow]}>
+            <View style={[styles.chatIcon, isBotNotifications && styles.botNotificationsIcon]}>
+              <Ionicons name={isBotNotifications ? 'notifications-outline' : chatIcon(chat.id)} size={20} color={colors.primary} />
+              {isBotNotifications && chat.unread > 0 ? <View style={styles.notificationDot} /> : null}
+            </View>
             <View style={styles.flex}>
               <Text style={styles.cardTitle}>{chat.name}</Text>
               <Body muted>{chat.lastMessage}</Body>
             </View>
-            {chat.unread ? <Badge label={String(chat.unread)} /> : null}
+            {chat.unread ? <Badge label={String(chat.unread)} tone="red" /> : null}
             <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
           </Card>
         </Pressable>
-      )) : <EmptyState title="Sin conversaciones" message="Tus consultas y notificaciones aparecerán acá." />}
+      )}) : <EmptyState title="Sin conversaciones" message="Tus consultas aparecerán acá." />}
     </Screen>
   );
+}
+
+function chatIcon(type: string): keyof typeof Ionicons.glyphMap {
+  switch (type) {
+    case 'soporte': return 'chatbubble-ellipses-outline';
+    case 'poliza': return 'shield-checkmark-outline';
+    default: return 'chatbubble-outline';
+  }
 }
 
 export function ConversationScreen() {
@@ -655,11 +726,27 @@ export function ConversationScreen() {
     mutationFn: () => chatService.send(id ?? 'bot', message),
     onSuccess: () => { setMessage(''); queryClient.invalidateQueries({ queryKey: ['messages', id] }); },
   });
-  const title = id === 'soporte' ? 'Soporte SubastAR' : id === 'poliza' ? 'Póliza de seguro' : 'Asistente SubastAR';
+  const isBotNotifications = id === 'bot' || id === 'notificaciones';
+  const title = id === 'soporte' ? 'Soporte SubastAR' : id === 'poliza' ? 'Póliza de seguro' : isBotNotifications ? 'Bot - Notificaciones' : 'Asistente SubastAR';
+  useEffect(() => {
+    if (!isBotNotifications) return;
+    chatService.markNotificationsRead()
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: ['notifications-summary'] });
+        queryClient.invalidateQueries({ queryKey: ['notifications'] });
+        queryClient.invalidateQueries({ queryKey: ['chats'] });
+      })
+      .catch(() => undefined);
+  }, [isBotNotifications, queryClient]);
   return (
     <Screen>
       <Header title={title} onBack={back} />
-      <StatusCard icon="chatbubble-ellipses-outline" title="Canal de consulta" message="Usá este espacio para coordinar soporte, entregas o consultas de póliza." tone="purple" />
+      <StatusCard
+        icon={isBotNotifications ? 'hardware-chip-outline' : 'chatbubble-ellipses-outline'}
+        title={isBotNotifications ? 'Centro de avisos de SubastAR' : 'Canal de consulta'}
+        message={isBotNotifications ? 'Avisos sobre compras, pujas, bienes, pagos y multas.' : 'Usá este espacio para coordinar soporte, entregas o consultas de póliza.'}
+        tone="purple"
+      />
       {isLoading ? <LoadingState /> : isError ? <ErrorState onRetry={() => refetch()} /> : data?.map((message) => (
         <View key={message.id} style={[styles.bubble, message.author === 'user' && styles.userBubble]}>
           <Text style={[styles.message, message.author === 'user' && styles.userMessage]}>{message.text}</Text>
@@ -671,6 +758,57 @@ export function ConversationScreen() {
         <Button label={send.isPending ? 'Enviando...' : 'Enviar'} disabled={!message.trim() || send.isPending} onPress={() => send.mutate()} />
       </View>
       {send.isError ? <Body muted>{send.error instanceof Error ? send.error.message : 'No fue posible enviar el mensaje.'}</Body> : null}
+    </Screen>
+  );
+}
+
+function notificationIcon(type: string): keyof typeof Ionicons.glyphMap {
+  switch (type) {
+    case 'compra': return 'bag-check-outline';
+    case 'multa': return 'warning-outline';
+    case 'bien': return 'cube-outline';
+    case 'poliza': return 'shield-checkmark-outline';
+    default: return 'notifications-outline';
+  }
+}
+
+export function NotificationCenterScreen() {
+  const back = useSafeBack();
+  const queryClient = useQueryClient();
+  const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['notifications'], queryFn: chatService.notifications });
+  const markRead = useMutation({
+    mutationFn: () => chatService.markNotificationsRead(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['chats'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
+  const hasUnreadNotifications = data?.some((notification) => !notification.read) ?? false;
+
+  useEffect(() => {
+    if (hasUnreadNotifications && !markRead.isPending) markRead.mutate();
+  }, [hasUnreadNotifications, markRead]);
+
+  return (
+    <Screen>
+      <Header title="Bot - Notificaciones" onBack={back} />
+      <StatusCard icon="hardware-chip-outline" title="Centro de avisos de SubastAR" message="Acá vas a encontrar avisos sobre compras, pujas, bienes, pagos y multas." tone="purple" />
+      {isLoading ? <LoadingState /> : isError ? <ErrorState onRetry={() => refetch()} /> : data?.length ? data.map((notification) => (
+        <Card key={notification.id} style={styles.notificationCard}>
+          <View style={styles.notificationIconWrap}>
+            <Ionicons name={notificationIcon(notification.type)} size={22} color={colors.primary} />
+          </View>
+          <View style={styles.flex}>
+            <View style={styles.notificationTitleRow}>
+              <Text style={styles.cardTitle}>{notification.title}</Text>
+              {!notification.read ? <Badge label="Nuevo" tone="red" /> : null}
+            </View>
+            <Body muted>{notification.content}</Body>
+            <Text style={styles.time}>{notification.timestamp}</Text>
+          </View>
+        </Card>
+      )) : <EmptyState title="Sin notificaciones" message="Los avisos importantes aparecerán acá." />}
     </Screen>
   );
 }
@@ -748,6 +886,8 @@ export function PaymentAddScreen() {
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['payments'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['chats'] });
       router.replace({ pathname: '/payment-success', params: { returnTo, type: kind, onboarding: onboarding ?? 'false' } });
     },
   });
@@ -824,6 +964,8 @@ export function AssetDetailScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['assets'] });
       queryClient.invalidateQueries({ queryKey: ['asset', id] });
+      queryClient.invalidateQueries({ queryKey: ['notifications-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['chats'] });
     },
   });
   if (isLoading) return <Screen><LoadingState /></Screen>;
@@ -1100,7 +1242,14 @@ const styles = StyleSheet.create({
   value: { color: colors.text, fontSize: typography.body, fontFamily: fonts.regular },
   valueBold: { fontFamily: fonts.black, color: colors.primaryDark },
   policy: { backgroundColor: colors.primarySoft },
-  invoiceText: { fontFamily: fonts.regular, color: colors.text, lineHeight: 24 },
+  invoiceHero: { alignItems: 'stretch', gap: spacing.md, backgroundColor: colors.surface },
+  invoiceHeroHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  invoiceHeroCopy: { alignItems: 'center', gap: spacing.xs },
+  invoiceIcon: { width: 56, height: 56, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primarySoft },
+  invoiceActions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  invoicePaper: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, padding: spacing.lg, gap: spacing.md },
+  invoiceText: { fontFamily: Platform.OS === 'web' ? 'monospace' : fonts.regular, color: colors.text, fontSize: typography.body, lineHeight: 24 },
+  invoiceMetaGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
   filters: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   filter: { borderRadius: radius.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, backgroundColor: colors.surfaceAlt },
   filterActive: { backgroundColor: colors.primarySoft },
@@ -1110,6 +1259,12 @@ const styles = StyleSheet.create({
   chatRow: { flexDirection: 'row', alignItems: 'center' },
   paymentRow: { gap: spacing.xs },
   chatIcon: { width: 42, height: 42, backgroundColor: colors.primarySoft, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  botNotificationsRow: { borderColor: colors.primaryBorder, backgroundColor: colors.primarySoft },
+  botNotificationsIcon: { borderWidth: 1, borderColor: colors.primaryBorder },
+  notificationCard: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
+  notificationIconWrap: { position: 'relative', width: 42, height: 42, backgroundColor: colors.primarySoft, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  notificationDot: { position: 'absolute', right: 1, top: 1, width: 9, height: 9, borderRadius: 5, backgroundColor: colors.danger, borderWidth: 1.5, borderColor: colors.surface },
+  notificationTitleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.sm },
   flex: { flex: 1 },
   bubble: { maxWidth: '84%', alignSelf: 'flex-start', padding: spacing.md, borderRadius: radius.lg, backgroundColor: colors.surfaceAlt, gap: spacing.xs },
   userBubble: { alignSelf: 'flex-end', backgroundColor: colors.primary },

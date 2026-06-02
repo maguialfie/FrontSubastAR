@@ -42,6 +42,10 @@ function InfoRow({ icon, label, value }: { icon: keyof typeof Ionicons.glyphMap;
   );
 }
 
+function formatAuctionMoney(value: number, currency?: string) {
+  return `${currency ?? 'ARS'} ${new Intl.NumberFormat('es-AR').format(value)}`;
+}
+
 function BidHistoryRow({ bidder, amount, timestamp, leader }: { bidder: string; amount: number; timestamp: string; leader?: boolean }) {
   return (
     <View style={styles.bidRow}>
@@ -74,10 +78,9 @@ export function HomeScreen() {
   }
   return (
     <Screen>
-      <Header title="" right={<IconButton icon="notifications-outline" accessibilityLabel="Notificaciones" tone="neutral" />} />
-      <Body muted>Bienvenido{session ? `, ${session.profile.name.split(' ')[0]}` : ''}</Body>
-      <Title>Subastas seleccionadas</Title>
-      <Card style={styles.homeHero}>
+      <Header title="" right={<Body muted><Text style={{ textAlign: 'right' }}>Bienvenido{session ? `, ${session.profile.name.split(' ')[0]}` : ''}</Text></Body>} />
+        <Title>Subastas seleccionadas</Title>
+        <Card style={styles.homeHero}>
         <View style={styles.heroHeader}>
           <View style={styles.heroMark}><Ionicons name="hammer-outline" size={20} color={colors.primary} /></View>
           <View style={styles.heroHeaderCopy}>
@@ -153,7 +156,7 @@ export function AuctionDetailScreen() {
   const router = useRouter();
   const back = useSafeBack();
   const id = useId();
-  const { data: auction, isLoading, isError, refetch } = useQuery({ queryKey: ['auction', id], queryFn: () => auctionService.get(id) });
+  const { data: auction, isLoading, isError, refetch } = useQuery({ queryKey: ['auction', id], queryFn: () => auctionService.get(id), enabled: !!id });
   if (isLoading) return <Screen><LoadingState /></Screen>;
   if (isError || !auction) return <Screen><Header title="Datos subasta" onBack={back} /><ErrorState onRetry={() => refetch()} /></Screen>;
   return (
@@ -192,16 +195,24 @@ export function CatalogScreen() {
   const back = useSafeBack();
   const id = useId();
   const [filter, setFilter] = useState('Todas');
-  const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['catalog', id], queryFn: () => auctionService.catalog(id) });
-  const { data: auction } = useQuery({ queryKey: ['auction', id], queryFn: () => auctionService.get(id) });
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ['catalog', id],
+    queryFn: () => auctionService.catalog(id),
+    enabled: !!id,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
+  });
+  const { data: auction } = useQuery({ queryKey: ['auction', id], queryFn: () => auctionService.get(id), enabled: !!id });
   const lots = data?.filter((lot) => {
+    const status = lot.status?.toLowerCase();
     if (filter === 'Todas') return true;
-    const sold = lot.status?.toLowerCase() === 'vendido' || lot.status?.toLowerCase() === 'subastado';
-    return filter === 'Vendidos' ? sold : !sold;
+    const sold = status === 'vendido' || status === 'subastado';
+    const closedWithoutBid = status === 'sin_puja';
+    return filter === 'Vendidos' ? sold || closedWithoutBid : !sold && !closedWithoutBid;
   });
   return (
     <Screen>
-      <Header title="Catálogo" subtitle={auction?.name} onBack={back} />
+      <Header title="Catálogo" subtitle={auction?.name} onBack={back} right={<IconButton icon="refresh-outline" accessibilityLabel="Actualizar catálogo" onPress={() => refetch()} />} />
       <SectionHeader title="Estado de lotes" subtitle="Ordená por disponibilidad para encontrar piezas activas" />
       <View style={styles.chips}>
         {['Todas', 'Disponibles', 'Vendidos'].map((item) => <Chip key={item} label={item} active={filter === item} onPress={() => setFilter(item)} />)}
@@ -221,9 +232,11 @@ export function LotDetailScreen() {
   const back = useSafeBack();
   const id = useId();
   const { auctionId } = useLocalSearchParams<{ auctionId?: string }>();
+  const canLoadLot = !!id && !!auctionId;
   const [authModal, setAuthModal] = useState(false);
   const { session } = useSession();
-  const { data: lot, isLoading, isError, refetch } = useQuery({ queryKey: ['lot', id, auctionId], queryFn: () => auctionService.lot(id, auctionId ?? '') });
+  const { data: lot, isLoading, isError, refetch } = useQuery({ queryKey: ['lot', id, auctionId], queryFn: () => auctionService.lot(id, auctionId ?? ''), enabled: canLoadLot });
+  if (!auctionId) return <Screen><Header title="Detalle del lote" onBack={back} /><EmptyState title="No se encontró la subasta del lote" message="Volvé al catálogo para abrir esta pieza nuevamente." /></Screen>;
   if (isLoading) return <Screen><LoadingState /></Screen>;
   if (isError || !lot) return <Screen><Header title="Detalle del lote" onBack={back} /><ErrorState onRetry={() => refetch()} /></Screen>;
   const joinLive = () => session ? router.push(`/live/${lot.auctionId}`) : setAuthModal(true);
@@ -271,10 +284,13 @@ export function LiveAuctionScreen() {
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['live', id],
     queryFn: () => auctionService.live(id),
+    enabled: !!id,
     refetchInterval: 5000,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
   });
   const { data: paymentData } = useQuery({ queryKey: ['payments'], queryFn: paymentService.list });
-  const { data: auction } = useQuery({ queryKey: ['auction', id], queryFn: () => auctionService.get(id) });
+  const { data: auction } = useQuery({ queryKey: ['auction', id], queryFn: () => auctionService.get(id), enabled: !!id });
   const usablePayments = paymentData?.filter((payment) => payment.verified) ?? [];
   useEffect(() => {
     if (data?.lot?.id) setLastLotId(data.lot.id);
@@ -285,14 +301,26 @@ export function LiveAuctionScreen() {
     <Screen>
       <Header title="Subasta en vivo" onBack={back} />
       <EmptyState title="No hay lote activo" message="El lote finalizó o aún no comenzó." />
+      <Button label="Actualizar estado" variant="ghost" onPress={() => refetch()} />
       {lastLotId ? <Button label="Consultar resultado del lote" onPress={() => router.push({ pathname: '/result/[id]', params: { id, itemId: lastLotId } })} /> : null}
     </Screen>
   );
+  const currency = auction?.currency ?? 'ARS';
+  const quickAmounts = [
+    { label: 'Mínima', value: data.minBid },
+    { label: '+1%', value: Math.max(data.minBid, data.bestBid > 0 ? data.bestBid + data.lot.basePrice * 0.01 : data.minBid) },
+    { label: '+5%', value: Math.max(data.minBid, (data.bestBid || data.lot.basePrice) + data.lot.basePrice * 0.05) },
+    { label: '+10%', value: Math.max(data.minBid, (data.bestBid || data.lot.basePrice) + data.lot.basePrice * 0.1) },
+  ];
+  const amountValue = Number(amount);
+  const hasInvalidAmount = !!amount && !Number.isFinite(amountValue);
+  const isBelowMinimum = !!amount && Number.isFinite(amountValue) && amountValue < data.minBid;
+  const isAboveMaximum = !!amount && data.maxBid != null && amountValue > data.maxBid;
   return (
     <Screen>
       <Header title="Subasta en vivo" subtitle={auction?.name} onBack={back} />
       <Card style={styles.liveBannerCard}>
-        <View style={styles.liveBanner}><View style={styles.liveDot} /><Text style={styles.liveText}>EN VIVO</Text><Text style={styles.timer}>00:{data.secondsLeft}</Text></View>
+        <View style={styles.liveBanner}><View style={styles.liveDot} /><Text style={styles.liveText}>EN VIVO</Text><Text style={styles.timer}>00:{data.secondsLeft != null ? String(data.secondsLeft).padStart(2, '0') : '--'}</Text></View>
         <Text style={styles.liveTitle}>{data.lot.title}</Text>
         <Body muted>{auction?.location ?? 'Subasta activa'}</Body>
       </Card>
@@ -300,19 +328,24 @@ export function LiveAuctionScreen() {
       <Card style={styles.bidPanel}>
         <SectionHeader title="Consola de puja" subtitle="Elegí un monto rápido o ingresalo manualmente" />
         <Body muted>Mejor oferta actual</Body>
-        <Text style={styles.offer}>{formatCurrency(data.bestBid)}</Text>
+        <Text style={styles.offer}>{data.bestBid > 0 ? formatAuctionMoney(data.bestBid, currency) : 'Sin ofertas todavía'}</Text>
+        {data.bestBid <= 0 ? <Body muted>Precio base: {formatAuctionMoney(data.lot.basePrice, currency)}</Body> : null}
         <View style={styles.tileRow}>
-          <InfoTile icon="trending-up-outline" label="Puja mínima" value={formatCurrency(data.minBid)} />
-          <InfoTile icon="shield-checkmark-outline" label="Puja máxima" value={data.maxBid != null ? formatCurrency(data.maxBid) : 'Sin tope'} />
+          <InfoTile icon="trending-up-outline" label="Puja mínima" value={formatAuctionMoney(data.minBid, currency)} />
+          <InfoTile icon="shield-checkmark-outline" label="Puja máxima" value={data.maxBid != null ? formatAuctionMoney(data.maxBid, currency) : 'Sin tope'} />
         </View>
         <View style={styles.quickBids}>
-          {[100, 500, 1000].map((step) => (
-            <Pressable key={step} style={styles.quickBid} onPress={() => setAmount(String(Math.max(data.minBid, data.bestBid + step)))}>
-              <Text style={styles.quickBidLabel}>+{step}</Text>
+          {quickAmounts.map((item) => (
+            <Pressable key={item.label} style={styles.quickBid} onPress={() => setAmount(String(Math.round(item.value)))}>
+              <Text style={styles.quickBidLabel}>{item.label}</Text>
+              <Text style={styles.quickBidValue}>{formatAuctionMoney(item.value, currency)}</Text>
             </Pressable>
           ))}
         </View>
         <Input label="Tu oferta" value={amount} keyboardType="number-pad" onChangeText={setAmount} />
+        {hasInvalidAmount ? <Body muted>Ingresá un monto numérico válido.</Body> : null}
+        {isBelowMinimum ? <Body muted>La puja mínima es {formatAuctionMoney(data.minBid, currency)}.</Body> : null}
+        {isAboveMaximum ? <Body muted>El monto supera el máximo general. Si tu categoría lo permite, el backend validará la operación.</Body> : null}
         {usablePayments.length ? usablePayments.map((payment) => (
           <Pressable key={payment.id} onPress={() => setPaymentId(payment.id)}>
             <PaymentMethodCard payment={payment} selected={paymentId === payment.id} />
@@ -324,7 +357,7 @@ export function LiveAuctionScreen() {
         )}
         <Button
           label="Pujar ahora"
-          disabled={!paymentId || !amount.trim() || Number(amount) <= 0}
+          disabled={!paymentId || !amount.trim() || !Number.isFinite(amountValue) || amountValue < data.minBid}
           onPress={() => router.push(`/live/${id}/confirm?amount=${encodeURIComponent(amount)}&paymentId=${encodeURIComponent(paymentId)}&itemId=${data.lot?.id}`)}
         />
       </Card>
@@ -335,6 +368,7 @@ export function LiveAuctionScreen() {
         ))}
       </Card>
       <Button label="Ver historial completo" variant="ghost" onPress={() => router.push(`/live/${id}/history?itemId=${data.lot?.id}`)} />
+      <Button label="Actualizar estado" variant="ghost" onPress={() => refetch()} />
     </Screen>
   );
 }
@@ -370,16 +404,24 @@ export function ConfirmBidScreen() {
   const queryClient = useQueryClient();
   const { id, amount, paymentId, itemId } = useLocalSearchParams<{ id: string; amount?: string; paymentId?: string; itemId?: string }>();
   const { data: payments, isLoading } = useQuery({ queryKey: ['payments'], queryFn: paymentService.list });
+  const { data: auction, isLoading: loadingAuction } = useQuery({ queryKey: ['auction', id], queryFn: () => auctionService.get(id), enabled: !!id });
+  const { data: live, isLoading: loadingLive } = useQuery({ queryKey: ['live', id], queryFn: () => auctionService.live(id), enabled: !!id });
   const [accepted, setAccepted] = useState(false);
   const payment = payments?.find((method) => method.id === paymentId);
+  const amountValue = Number(amount);
+  const hasInvalidAmount = !Number.isFinite(amountValue);
+  const belowCurrentMinimum = live ? amountValue < live.minBid : false;
+  const currency = auction?.currency ?? 'ARS';
   const mutation = useMutation({
     mutationFn: () => auctionService.bid(id, Number(amount), paymentId ?? ''),
     onSuccess: () => {
       setAccepted(true);
       queryClient.invalidateQueries({ queryKey: ['live', id] });
+      queryClient.invalidateQueries({ queryKey: ['notifications-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['chats'] });
     },
   });
-  if (isLoading) return <Screen><LoadingState /></Screen>;
+  if (isLoading || loadingAuction || loadingLive) return <Screen><LoadingState /></Screen>;
   if (!amount || !paymentId || !payment) return <Screen><Header title="Confirmar puja" onBack={back} /><EmptyState title="Puja incompleta" message="Seleccioná monto y medio de pago desde la subasta en vivo." /></Screen>;
   const bidError = mutation.error instanceof ApiError ? mutation.error : undefined;
   const restricted = bidError?.status === 403;
@@ -397,7 +439,8 @@ export function ConfirmBidScreen() {
           tone={accepted ? 'green' : 'purple'}
         />
         <Body muted>Monto de tu oferta</Body>
-        <Text style={styles.offer}>{formatCurrency(Number(amount))}</Text>
+        <Text style={styles.offer}>{formatAuctionMoney(amountValue, currency)}</Text>
+        {belowCurrentMinimum ? <Body muted>La puja mínima actual es {formatAuctionMoney(live?.minBid ?? 0, currency)}. Volvé a la subasta en vivo para elegir otro monto.</Body> : null}
         <PaymentMethodCard payment={payment} selected />
         <Divider />
         <SecurityNote text="Confirmar una puja genera una obligación de compra según las condiciones de la subasta." />
@@ -412,7 +455,7 @@ export function ConfirmBidScreen() {
           onAction={() => router.push('/profile/account-status')}
         />
       ) : null}
-      {!accepted ? <Button label={mutation.isPending ? 'Enviando...' : 'Confirmar puja'} disabled={mutation.isPending} onPress={() => mutation.mutate()} /> : (
+      {!accepted ? <Button label={mutation.isPending ? 'Enviando...' : 'Confirmar puja'} disabled={mutation.isPending || hasInvalidAmount || belowCurrentMinimum} onPress={() => mutation.mutate()} /> : (
         <>
           <Button label="Volver a la subasta en vivo" onPress={() => router.replace(`/live/${id}`)} />
           {itemId ? <Button label="Consultar resultado luego" variant="secondary" onPress={() => router.push({ pathname: '/result/[id]', params: { id, itemId } })} /> : null}
@@ -474,7 +517,7 @@ export function AuctionFiltersScreen() {
       <SectionLabel>Estado</SectionLabel>
       <View style={styles.chips}>{['Todas', 'En vivo', 'Próximas'].map((item) => <Chip key={item} label={item} active={status === item} onPress={() => setStatus(item)} />)}</View>
       <SectionLabel>Categoría</SectionLabel>
-      <View style={styles.chips}>{['Todas', 'Oro', 'Platino', 'Plata', 'Especial', 'Común'].map((item) => <Chip key={item} label={item} active={category === item} onPress={() => setCategory(item)} />)}</View>
+      <View style={styles.chips}>{['Todas', 'Oro', 'Platino', 'Plata', 'Especial', 'Común', 'Otro'].map((item) => <Chip key={item} label={item} active={category === item} onPress={() => setCategory(item)} />)}</View>
       <SectionLabel>Moneda</SectionLabel>
       <View style={styles.chips}>{['USD', 'ARS'].map((item) => <Chip key={item} label={item} active={currency === item} onPress={() => setCurrency(item)} />)}</View>
       <Button label="Aplicar filtros" onPress={() => router.replace({ pathname: '/(tabs)/auctions', params: { status, category, currency } })} />
@@ -535,9 +578,10 @@ const styles = StyleSheet.create({
   total: { alignSelf: 'stretch' },
   resultLine: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.md },
   resultValue: { color: colors.text, fontFamily: fonts.bold, fontSize: typography.body, textAlign: 'right' },
-  quickBids: { flexDirection: 'row', gap: spacing.sm },
-  quickBid: { flex: 1, minHeight: 40, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill, backgroundColor: colors.primarySoft, borderWidth: 1, borderColor: colors.primaryBorder },
+  quickBids: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  quickBid: { minWidth: '46%', flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill, backgroundColor: colors.primarySoft, borderWidth: 1, borderColor: colors.primaryBorder },
   quickBidLabel: { color: colors.primary, fontFamily: fonts.black, fontSize: typography.caption },
+  quickBidValue: { color: colors.primaryDark, fontFamily: fonts.bold, fontSize: 10 },
 });
 
 

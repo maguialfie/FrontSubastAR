@@ -58,6 +58,7 @@ export function LotCard({ lot, onPress }: { lot: Lot; onPress: () => void }) {
       <View style={styles.lotCopy}>
         <Text numberOfLines={2} style={styles.lotTitle}>{lot.title}</Text>
         <Text numberOfLines={2} style={styles.meta}>{lot.description}</Text>
+        <Text style={styles.meta}>Estado: {lot.status ?? 'disponible'}</Text>
         <Text style={styles.price}>{formatMoney(lot.basePrice)}</Text>
       </View>
     </Pressable>

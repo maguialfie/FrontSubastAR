@@ -10,6 +10,7 @@ import type {
   InsurancePolicy,
   Lot,
   Message,
+  NotificationsSummary,
   OwnedAsset,
   PaymentMethod,
   PaymentMethodCreate,
@@ -17,9 +18,13 @@ import type {
   Session,
   UserDetails,
   UserMetrics,
+  UserNotification,
 } from '@/types/domain';
 import { buildCloudinaryDeliveryUrl, uploadImageToCloudinary } from '@/services/cloudinary';
 import { apiConfig, apiRoutes, request, requestText } from '@/services/http';
+import { File, Paths } from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+import { Platform } from 'react-native';
 
 export const API_BASE_URL = apiConfig.baseUrl;
 
@@ -30,7 +35,7 @@ type BackendAuction = {
   estado: string; total_articulos: number; rematador: string;
 };
 type BackendLot = {
-  id: number; numero_pieza: string; nombre: string; descripcion: string; precio_base?: number; imagenes?: string[];
+  id: number; numero_pieza?: string; nombre: string; descripcion?: string; precio_base?: number; imagenes?: string[];
   artista?: string; historia?: string; fecha_creacion?: string; dueno_actual?: string; estado?: string;
 };
 type BackendBid = { id: number; nombre_usuario: string; monto: number; timestamp: string; es_ganadora?: boolean };
@@ -64,10 +69,12 @@ type BackendAsset = {
 type BackendPurchase = {
   id: number; nombre_item: string; subasta: string; fecha?: string; valor_pujado: number; multa: number;
   estado_pago: string; estado_entrega: string; costo_envio?: number; total?: number; medio_pago?: string;
-  direccion_entrega?: string; factura_url?: string; poliza_id?: string;
+  direccion_entrega?: string; factura_url?: string; poliza_id?: string | null; numero_poliza?: string | null;
 };
 type BackendConversation = { tipo: string; titulo: string; subtitulo: string; mensajes_no_leidos: number };
 type BackendMessage = { id: number; emisor: string; contenido: string; timestamp: string };
+type BackendNotificationsSummary = { total_no_leidas: number; hay_no_leidas: boolean; por_tipo?: Record<string, number> };
+type BackendNotification = { id: number; tipo: string; titulo?: string; contenido: string; timestamp: string; leido: boolean };
 type BackendProfile = BackendUser & { domicilio?: string; paisOrigen?: string; pais_origen?: string; dni?: string };
 type BackendCountry = { numero: number; nombre: string; nombreCorto: string; capital: string; nacionalidad: string; idiomas: string };
 type CountryOption = { id: string; code: string; name: string; capital?: string; nationality?: string; languages?: string };
@@ -99,12 +106,13 @@ function mapStatus(status: string): Auction['status'] {
 }
 
 function mapAuction(auction: BackendAuction): Auction {
+  const normalizedCategory = auction.categoria.toLowerCase();
   return {
     id: String(auction.id),
     name: auction.nombre,
     location: auction.direccion,
     date: auction.fecha_inicio,
-    category: auction.categoria,
+    category: normalizedCategory === 'otro' ? 'Otro' : normalizedCategory === 'comun' ? 'Común' : auction.categoria,
     currency: auction.moneda,
     auctioneer: auction.rematador,
     totalLots: auction.total_articulos,
@@ -116,9 +124,9 @@ function mapLot(lot: BackendLot, auctionId: string): Lot {
   return {
     id: String(lot.id),
     auctionId,
-    lotNumber: lot.numero_pieza,
+    lotNumber: lot.numero_pieza ?? String(lot.id),
     title: lot.nombre,
-    description: lot.descripcion,
+    description: lot.descripcion ?? '',
     basePrice: lot.precio_base ?? 0,
     category: lot.artista ? 'Obra de arte' : 'Objeto',
     artist: lot.artista,
@@ -148,7 +156,8 @@ function mapPurchase(purchase: BackendPurchase): Purchase {
     fee: purchase.multa ?? 0,
     paymentStatus: purchase.estado_pago,
     deliveryStatus: purchase.estado_entrega,
-    insuranceId: purchase.poliza_id,
+    insuranceId: purchase.poliza_id ?? purchase.numero_poliza ?? undefined,
+    insuranceNumber: purchase.numero_poliza ?? purchase.poliza_id ?? undefined,
     shippingCost: purchase.costo_envio,
     total: purchase.total,
     paymentMethod: purchase.medio_pago,
@@ -207,6 +216,17 @@ function appendFile(form: FormData, name: string, file: FileUpload) {
     name: file.name || 'archivo',
     type: file.type || 'application/octet-stream',
   } as unknown as Blob);
+}
+
+function titleForNotificationType(type: string) {
+  switch (type) {
+    case 'compra': return 'Compra';
+    case 'multa': return 'Multa';
+    case 'bien': return 'Bien';
+    case 'poliza': return 'Póliza';
+    case 'bot': return 'Aviso';
+    default: return 'Notificación';
+  }
 }
 
 export const authService = {
@@ -278,12 +298,15 @@ export const auctionService = {
             ? 'especial'
             : filters?.category === 'Común'
               ? 'comun'
-              : undefined;
+              : filters?.category === 'Otro'
+                ? 'otro'
+                : undefined;
     if (filters?.search) params.set('busqueda', filters.search);
     if (statusValue) params.set('estado', statusValue);
     if (categoryValue) params.set('categoria', categoryValue);
     if (filters?.currency && filters.currency !== 'Todas') params.set('moneda', filters.currency);
-    return (await request<BackendAuction[]>(`${apiRoutes.auctions}?${params.toString()}`)).map(mapAuction);
+    const query = params.toString();
+    return (await request<BackendAuction[]>(query ? `${apiRoutes.auctions}?${query}` : apiRoutes.auctions)).map(mapAuction);
   },
   async get(id: string) {
     return mapAuction(await request<BackendAuction>(apiRoutes.auction(id)));
@@ -301,6 +324,7 @@ export const auctionService = {
       bestBid: live.mejor_oferta ?? 0,
       minBid: live.puja_minima ?? 0,
       maxBid: live.puja_maxima,
+      basePrice: live.item_actual?.precio_base ?? 0,
       secondsLeft: live.segundos_restantes,
       history: (live.historial_pujas ?? []).map((bid) => ({ id: String(bid.id), bidder: bid.nombre_usuario, amount: bid.monto, timestamp: bid.timestamp })),
     };
@@ -418,13 +442,35 @@ export const purchaseService = {
   async invoiceContent(id: string) {
     return requestText(apiRoutes.invoiceDownload(id));
   },
+  async downloadInvoice(id: string) {
+    const text = await this.invoiceContent(id);
+    const filename = `factura-${id}.txt`;
+    if (Platform.OS === 'web') {
+      const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      return;
+    }
+
+    if (!await Sharing.isAvailableAsync()) throw new Error('No es posible guardar la factura en este dispositivo.');
+    const file = new File(Paths.cache, filename);
+    file.create({ overwrite: true });
+    file.write(text);
+    await Sharing.shareAsync(file.uri, { mimeType: 'text/plain', dialogTitle: 'Guardar factura TXT', UTI: 'public.plain-text' });
+  },
 };
 
 export const insuranceService = {
   async get(id: string): Promise<InsurancePolicy> {
     const policy = await request<BackendPolicy>(apiRoutes.insurance(id));
     return {
-      id: policy.id ? String(policy.id) : undefined, number: policy.numero_poliza, company: policy.aseguradora,
+      id: policy.numero_poliza, number: policy.numero_poliza, company: policy.aseguradora,
       beneficiary: policy.beneficiario, insuredValue: policy.valor_asegurado, validFrom: policy.vigencia_desde,
       validUntil: policy.vigencia_hasta, coverage: policy.cobertura, items: policy.piezas ?? [],
       contact: policy.contacto_aseguradora ? {
@@ -524,5 +570,22 @@ export const chatService = {
   async send(type: string, content: string): Promise<Message> {
     const message = await request<BackendMessage>(apiRoutes.sendMessage(type), { method: 'POST', body: JSON.stringify({ contenido: content }) });
     return { id: String(message.id), author: 'user', text: message.contenido, time: message.timestamp };
+  },
+  async notificationsSummary(): Promise<NotificationsSummary> {
+    const summary = await request<BackendNotificationsSummary>(apiRoutes.notificationsSummary);
+    return { totalUnread: summary.total_no_leidas, hasUnread: summary.hay_no_leidas, byType: summary.por_tipo ?? {} };
+  },
+  async notifications(): Promise<UserNotification[]> {
+    return (await request<BackendNotification[]>(apiRoutes.notifications)).map((notification) => ({
+      id: String(notification.id),
+      type: notification.tipo,
+      title: notification.titulo ?? titleForNotificationType(notification.tipo),
+      content: notification.contenido,
+      timestamp: notification.timestamp,
+      read: notification.leido,
+    }));
+  },
+  async markNotificationsRead(types?: string[]) {
+    return request<void>(apiRoutes.markNotificationsRead, { method: 'POST', body: JSON.stringify({ tipos: types }) });
   },
 };

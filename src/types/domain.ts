@@ -64,6 +64,7 @@ export interface Purchase {
   deliveryStatus: string;
   paymentStatus: string;
   insuranceId?: string;
+  insuranceNumber?: string;
   auctionName?: string;
   date?: string;
   shippingCost?: number;
@@ -123,6 +124,21 @@ export interface Message {
   text: string;
   time: string;
 }
+
+export type NotificationsSummary = {
+  totalUnread: number;
+  hasUnread: boolean;
+  byType: Record<string, number>;
+};
+
+export type UserNotification = {
+  id: string;
+  type: string;
+  title: string;
+  content: string;
+  timestamp: string;
+  read: boolean;
+};
 
 export interface UserProfile {
   name: string;

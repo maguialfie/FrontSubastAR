@@ -44,6 +44,9 @@ export const apiRoutes = {
   insurance: (id: string) => `/seguros/${id}`,
   extendInsurance: (id: string) => `/seguros/${id}/ampliar`,
   conversations: '/chat/conversaciones',
+  notificationsSummary: '/chat/notificaciones/resumen',
+  notifications: '/chat/notificaciones',
+  markNotificationsRead: '/chat/notificaciones/marcar-leidas',
   messages: (type: string) => `/chat/conversaciones/${type}`,
   sendMessage: (type: string) => `/chat/conversaciones/${type}/mensajes`,
 } as const;

@@ -29,6 +29,12 @@
 - [ ] Las tarjetas muestran `Proximas` visualmente como `Proximas` con acento en la UI.
 - [ ] Datos de subasta abre catalogo y subasta en vivo cuando corresponde.
 - [ ] Catalogo abre detalle de lote con imagen.
+- [ ] Subasta con categoria backend `otro` aparece en el listado y se muestra como `Otro`.
+- [ ] Catalogo muestra lotes `disponible` aunque no tengan imagen y permite refrescar manualmente.
+- [ ] Detalle de lote conserva `auctionId`; si falta, muestra un mensaje claro para volver al catalogo.
+- [ ] Subasta en vivo muestra `item_actual` aunque venga resumido o sin imagen y permite refrescar manualmente.
+- [ ] Subasta en vivo usa la moneda real de la subasta, muestra precio base sin ofertas y accesos rapidos nunca menores a la puja minima.
+- [ ] Confirmar puja bloquea montos menores a la minima vigente y conserva el mensaje real si backend rechaza la operacion.
 - [ ] Puja en vivo muestra falta de medio o restriccion real si corresponde.
 - [ ] Confirmar puja refleja respuesta o error real de la API.
 - [ ] Resultado se valida solo cuando el endpoint backend este disponible.
@@ -66,10 +72,17 @@
 ## Compras, Chat Y Seguros
 
 - [ ] Detalle compra abre entrega y factura.
+- [ ] Factura muestra metadata de compra, vista previa estilada y descarga `factura-{id}.txt`.
+- [ ] Descargar factura baja el TXT en web y abre el menu de guardado o compartir en Android/iOS.
 - [ ] Entrega permite coordinar por chat.
 - [ ] Chat abre conversaciones tocando toda la fila.
+- [ ] Chat muestra `Bot - Notificaciones` como conversacion normal y sin card separada de notificaciones.
+- [ ] `Bot - Notificaciones` fusiona entradas `bot` y `notificaciones`, muestra badge rojo y abre el centro de avisos.
+- [ ] Abrir `Bot - Notificaciones` lista avisos, los marca como leidos y limpia el punto rojo del tab Chat.
 - [ ] Envio de mensaje solo se prueba si el endpoint fue incorporado.
-- [ ] Compra con `poliza_id` abre su poliza.
+- [ ] Compra con `poliza_id` abre su poliza y muestra `numero_poliza` cuando esta disponible.
+- [ ] Compra sin `poliza_id` pero con `numero_poliza` usa ese numero para consultar la poliza.
+- [ ] Seguros y Polizas deduplica las compras por identificador de poliza.
 - [ ] Poliza permite consultar contacto y solicitar ampliacion.
 
 ## Fallos Reales
