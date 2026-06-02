@@ -29,7 +29,8 @@ import { Platform } from 'react-native';
 export const API_BASE_URL = apiConfig.baseUrl;
 
 type BackendUser = { nombre: string; apellido: string; email: string; categoria: string; estado: string };
-type BackendLogin = { access_token: string; usuario: BackendUser };
+type BackendLoginTwoFactorStart = { requires_2fa: boolean; challenge_id: string; email: string; message: string };
+type BackendLogin = { access_token: string; token_type: string; usuario: BackendUser };
 type BackendAuction = {
   id: number; nombre: string; direccion: string; fecha_inicio: string; categoria: string; moneda: string;
   estado: string; total_articulos: number; rematador: string;
@@ -230,17 +231,30 @@ function titleForNotificationType(type: string) {
 }
 
 export const authService = {
-  async login(email: string, password: string): Promise<Session> {
-    const login = await request<BackendLogin>(apiRoutes.login, { method: 'POST', body: JSON.stringify({ email, password }) });
+  async login(email: string, password: string) {
+    const response = await request<BackendLoginTwoFactorStart>(apiRoutes.login, { method: 'POST', body: JSON.stringify({ email, password }) });
     return {
-      token: login.access_token,
-      profile: {
-        name: `${login.usuario.nombre} ${login.usuario.apellido}`,
-        email: login.usuario.email,
-        category: login.usuario.categoria,
-        status: login.usuario.estado === 'activo' ? 'Regular' : 'Bloqueado',
-        penalty: 0,
-      },
+      challengeId: response.challenge_id,
+      email: response.email,
+      message: response.message,
+    };
+  },
+  async verifyLogin2fa(challengeId: string, code: string): Promise<Session> {
+    const login = await request<BackendLogin>(apiRoutes.loginVerify2fa, {
+      method: 'POST',
+      body: JSON.stringify({ challenge_id: challengeId, codigo: code }),
+    });
+    return this.loginFromResponse(login);
+  },
+  async resendLogin2fa(challengeId: string) {
+    const response = await request<BackendLoginTwoFactorStart>(apiRoutes.loginResend2fa, {
+      method: 'POST',
+      body: JSON.stringify({ challenge_id: challengeId }),
+    });
+    return {
+      challengeId: response.challenge_id,
+      email: response.email,
+      message: response.message,
     };
   },
   async register(input: { name: string; surname: string; email: string; address: string; country: string; front: FileUpload; back: FileUpload }) {

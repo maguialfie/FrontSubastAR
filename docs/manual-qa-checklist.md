@@ -16,6 +16,10 @@
 
 - [ ] Welcome carga correctamente.
 - [ ] Login informa los errores devueltos por la API.
+- [ ] Login correcto navega a `/login-2fa` sin guardar sesion antes de verificar el codigo.
+- [ ] Login 2FA guarda sesion solo con codigo correcto y respeta `returnTo`.
+- [ ] Reenviar codigo 2FA reemplaza el challenge anterior y muestra el mensaje informativo.
+- [ ] Volver desde login 2FA no deja una sesion iniciada.
 - [ ] Continuar como invitado permite explorar subastas.
 - [ ] Registro permite cargar DNI frente y dorso.
 - [ ] Verificacion permite ingresar el codigo recibido.

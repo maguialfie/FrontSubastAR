@@ -26,6 +26,9 @@ const loginSchema = z.object({
   email: z.email('Ingresá un correo válido.'),
   password: z.string().min(6, 'Mínimo 6 caracteres.'),
 });
+const login2faSchema = z.object({
+  code: z.string().min(4, 'Ingresá el código recibido.').max(8, 'Código demasiado largo.'),
+});
 
 const registerSchema = z.object({
   name: z.string().min(2, 'Ingresa tu nombre.'),
@@ -91,7 +94,7 @@ export function LoginScreen() {
   const router = useRouter();
   const back = useSafeBack();
   const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
-  const { enterAsGuest, signIn } = useSession();
+  const { enterAsGuest } = useSession();
   const [apiError, setApiError] = useState('');
   const { control, handleSubmit, formState: { errors, isSubmitting } } = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
@@ -100,8 +103,16 @@ export function LoginScreen() {
   const submit = handleSubmit(async (values) => {
     try {
       setApiError('');
-      await signIn(await authService.login(values.email, values.password));
-      router.replace((returnTo || '/(tabs)') as Href);
+      const response = await authService.login(values.email, values.password);
+      router.push({
+        pathname: '/login-2fa',
+        params: {
+          challengeId: response.challengeId,
+          email: response.email,
+          message: response.message,
+          returnTo: returnTo || '/(tabs)',
+        },
+      });
     } catch (error) {
       setApiError(error instanceof Error ? error.message : 'No fue posible ingresar.');
     }
@@ -123,6 +134,75 @@ export function LoginScreen() {
         <Button label="¿No tienes una cuenta? Regístrate" variant="ghost" onPress={() => router.push({ pathname: '/register', params: { returnTo } })} />
         <View style={styles.centerSeparator}><Body muted>O</Body></View>
         <Button label="Continúa como un invitado" variant="ghost" onPress={() => { enterAsGuest(); router.replace('/(tabs)'); }} />
+      </Card>
+    </Screen>
+  );
+}
+
+export function LoginTwoFactorScreen() {
+  const router = useRouter();
+  const back = useSafeBack();
+  const { challengeId, email, message, returnTo } = useLocalSearchParams<{ challengeId?: string; email?: string; message?: string; returnTo?: string }>();
+  const { signIn } = useSession();
+  const [currentChallengeId, setCurrentChallengeId] = useState(challengeId ?? '');
+  const [currentEmail, setCurrentEmail] = useState(email ?? '');
+  const [apiError, setApiError] = useState('');
+  const [infoMessage, setInfoMessage] = useState(message ?? '');
+  const [isResending, setIsResending] = useState(false);
+  const { control, handleSubmit, formState: { errors, isSubmitting } } = useForm<z.infer<typeof login2faSchema>>({
+    resolver: zodResolver(login2faSchema),
+    defaultValues: { code: '' },
+  });
+  const submit = handleSubmit(async ({ code }) => {
+    if (!currentChallengeId) {
+      setApiError('No se encontró el desafío de seguridad. Volvé a iniciar sesión.');
+      return;
+    }
+    try {
+      setApiError('');
+      const session = await authService.verifyLogin2fa(currentChallengeId, code);
+      await signIn(session);
+      router.replace((returnTo || '/(tabs)') as Href);
+    } catch (error) {
+      setApiError(error instanceof Error ? error.message : 'Código inválido.');
+    }
+  });
+  async function resend() {
+    if (!currentChallengeId) {
+      setApiError('No se encontró el desafío de seguridad. Volvé a iniciar sesión.');
+      return;
+    }
+    try {
+      setApiError('');
+      setIsResending(true);
+      const response = await authService.resendLogin2fa(currentChallengeId);
+      setCurrentChallengeId(response.challengeId);
+      setCurrentEmail(response.email);
+      setInfoMessage('Te enviamos un nuevo código. El código anterior ya no es válido.');
+    } catch (error) {
+      setApiError(error instanceof Error ? error.message : 'No fue posible reenviar el código.');
+    } finally {
+      setIsResending(false);
+    }
+  }
+  return (
+    <Screen>
+      <Header title="Verificación de acceso" onBack={back} />
+      <Card style={styles.formCard}>
+        <StatusPanel
+          icon="mail-unread-outline"
+          title="Revisá tu correo"
+          message={`Enviamos un código de seguridad a ${currentEmail || 'tu correo'}. Ingresalo para completar el inicio de sesión.`}
+          tone="green"
+        />
+        <Controller control={control} name="code" render={({ field }) => (
+          <Input label="Código de verificación" placeholder="000000" keyboardType="number-pad" value={field.value} onChangeText={field.onChange} error={errors.code?.message} />
+        )} />
+        {infoMessage ? <Card style={styles.infoCard}><Body>{infoMessage}</Body></Card> : null}
+        {apiError ? <ErrorNotice message={apiError} /> : null}
+        <Button label={isSubmitting ? 'Verificando...' : 'Verificar código'} disabled={isSubmitting || isResending} onPress={submit} />
+        <Button label={isResending ? 'Reenviando...' : 'Reenviar código'} variant="secondary" disabled={isSubmitting || isResending} onPress={resend} />
+        <Button label="Volver al login" variant="ghost" onPress={() => router.replace('/login')} />
       </Card>
     </Screen>
   );
@@ -323,6 +403,7 @@ const styles = StyleSheet.create({
   centerSeparator: { alignItems: 'center' },
   tileRow: { flexDirection: 'row', gap: spacing.md, alignSelf: 'stretch' },
   errorCard: { backgroundColor: colors.dangerSoft, borderColor: '#F7C9C9', paddingVertical: spacing.sm },
+  infoCard: { backgroundColor: colors.successSoft, borderColor: colors.success },
   error: { color: colors.danger, fontSize: typography.small, fontFamily: fonts.bold, textAlign: 'center' },
   uploadRow: { flexDirection: 'row', gap: spacing.md },
   pending: { justifyContent: 'center' },

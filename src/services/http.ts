@@ -11,6 +11,8 @@ export const apiConfig = {
 
 export const apiRoutes = {
   login: '/auth/login',
+  loginVerify2fa: '/auth/login/verificar-2fa',
+  loginResend2fa: '/auth/login/reenviar-2fa',
   register: '/auth/registro',
   verifyCode: '/auth/verificar-codigo',
   finishRegistration: '/auth/completar-registro',
